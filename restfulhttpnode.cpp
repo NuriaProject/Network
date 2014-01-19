@@ -17,15 +17,12 @@
 
 #include "restfulhttpnode.hpp"
 
+#include <QJsonDocument>
 #include <callback.hpp>
 #include <QMetaObject>
 #include <QMetaMethod>
 #include <debug.hpp>
-
-#ifdef NURIA_USING_QT5
-#include <QJsonDocument>
 #include <QUrlQuery>
-#endif
 
 struct SlotData {
 	Nuria::Callback callback;
@@ -198,12 +195,7 @@ static QVariantList parseClientArguments (const SlotData &data, Nuria::HttpClien
 	// 
 	QVariantList arguments;
 	
-#ifdef NURIA_USING_QT5
 	QUrlQuery query (client->path ());
-#else
-	QUrl query (client->path ());
-#endif
-	
 	int len = types.length () - lastIsClient;
 	for (int i = 0; i < len; i++) {
 		int type = types.at (i);
@@ -324,14 +316,8 @@ void Nuria::RestfulHttpNode::registerActionSlots () {
 		// 
 		QByteArray signature ("1");
 		
-#ifdef NURIA_USING_QT5
 		signature.append (m.methodSignature ());
 		QByteArray methodName = m.name ();
-#else
-		signature.append (m.signature ());
-		QByteArray methodName (m.signature ());
-		methodName.chop (methodName.indexOf ('(') - methodName.length ());
-#endif
 		
 		// Skip all which don't end in "Action".
 		if (!methodName.endsWith ("Action")) {
