@@ -75,7 +75,6 @@ Nuria::HttpClient::HttpClient (QTcpSocket *socket, HttpServer *server)
 	this->d_ptr->contentLength = -1;
 	this->d_ptr->pipeDevice = 0;
 	this->d_ptr->pipeMaxlen = -1;
-	this->d_ptr->slotInfo = 0;
 	this->d_ptr->keepConnectionOpen = false;
 	
 	// Reparent socket
@@ -236,8 +235,8 @@ bool Nuria::HttpClient::bufferPostBody () {
 		}
 		
 		// And last but not least, check if the client wants to send too much data.
-		if (this->d_ptr->slotInfo &&
-		    this->d_ptr->postBodyLength > this->d_ptr->slotInfo->maxBodyLength ()) {
+		if (this->d_ptr->slotInfo.isValid () &&
+		    this->d_ptr->postBodyLength > this->d_ptr->slotInfo.maxBodyLength ()) {
 			killConnection (413);
 			return false;
 		}
@@ -274,7 +273,7 @@ bool Nuria::HttpClient::bufferPostBody () {
 		// We also use a in-memory buffer if the user told us to not buffer the data.
 		// This way we can always track how much data has been sent, so the
 		// kill-client-if-sent-too-much mechanism works correctly.
-		if ((this->d_ptr->slotInfo && this->d_ptr->slotInfo->streamPostBody ()) ||
+		if ((this->d_ptr->slotInfo.isValid () && this->d_ptr->slotInfo.streamPostBody ()) ||
 		    this->d_ptr->postBodyLength <= this->d_ptr->bufferMemorySize) {
 			
 			// Create a QByteArray with enough space to contain the complete body.
@@ -380,7 +379,7 @@ void Nuria::HttpClient::receivedData () {
 			
 			// If we're in non-streamed mode, we call the
 			// associated slot if the POST body is complete.
-			if (!(this->d_ptr->slotInfo && this->d_ptr->slotInfo->streamPostBody ()) &&
+			if (!(this->d_ptr->slotInfo.isValid () && this->d_ptr->slotInfo.streamPostBody ()) &&
 			    this->d_ptr->postBodyLength == this->d_ptr->postBodyTransferred) {
 				
 				// Seek the buffer to the beginning
@@ -1089,11 +1088,11 @@ void Nuria::HttpClient::setKeepConnectionOpen (bool keepOpen) {
 	this->d_ptr->keepConnectionOpen = keepOpen;
 }
 
-Nuria::SlotInfo *Nuria::HttpClient::slotInfo () const {
+Nuria::SlotInfo Nuria::HttpClient::slotInfo () const {
 	return this->d_ptr->slotInfo;
 }
 
-void Nuria::HttpClient::setSlotInfo (Nuria::SlotInfo *info) {
+void Nuria::HttpClient::setSlotInfo (const SlotInfo &info) {
 	this->d_ptr->slotInfo = info;
 }
 

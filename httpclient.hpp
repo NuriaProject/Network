@@ -607,14 +607,13 @@ public:
 	/**
 	 * Returns the associated slot info of the client.
 	 */
-	SlotInfo *slotInfo () const;
+	SlotInfo slotInfo () const;
 	
 	/**
 	 * Sets a SlotInfo for this client. This is needed when you're
-	 * subclassing HttpNode with non-streaming clients.
-	 * \warning HttpClient does not take ownership of \a info !
+	 * sub-classing HttpNode with non-streaming clients.
 	 */
-	void setSlotInfo (SlotInfo *info);
+	void setSlotInfo (const SlotInfo &info);
 	
 signals:
 	

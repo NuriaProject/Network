@@ -21,6 +21,7 @@
 #include "network_global.hpp"
 #include "httpclient.hpp"
 #include "callback.hpp"
+#include <QSharedData>
 #include <QObject>
 #include <QDir>
 
@@ -39,10 +40,19 @@ class NURIA_NETWORK_EXPORT SlotInfo {
 public:
 	
 	/** Constructor. */
-	SlotInfo (const Callback &callback);
+	SlotInfo (const Callback &callback = Callback ());
+	
+	/** Copy constructor. */
+	SlotInfo (const SlotInfo &other);
+	
+	/** Assignment operator. */
+	SlotInfo &operator= (const SlotInfo &other);
 	
 	/** Destructor. */
 	~SlotInfo ();
+	
+	/** Returns \c true if this instance is valid. */
+	bool isValid () const;
 	
 	/** Returns the associated Callback. */
 	Callback callback () const;
@@ -94,7 +104,7 @@ private:
 	friend class HttpNode;
 	
 	// 
-	SlotInfoPrivate *d;
+	QSharedDataPointer< SlotInfoPrivate > d;
 	
 };
 
@@ -199,7 +209,7 @@ public:
 	 * \note The slot 'index' is called when the user attempts to access this
 	 * node directly.
 	 */
-	SlotInfo *connectSlot (const QString &name, const Callback &callback);
+	SlotInfo connectSlot (const QString &name, const Callback &callback);
 	
 	/**
 	 * Connects a slot to this resource. The slot is callable by requesting
@@ -219,7 +229,7 @@ public:
 	 * \note The slot 'index' is called when the user attempts to access
 	 * this node directly.
 	 */
-	SlotInfo *connectSlot (const QString &name, QObject *receiver, const char *slot);
+	SlotInfo connectSlot (const QString &name, QObject *receiver, const char *slot);
 	
 	/**
 	 * Disconnects the slot \a name. If there was a slot with this name
@@ -390,7 +400,7 @@ private:
 	 * Calls the slot associated with \a info. Used by callSlotByName
 	 * and HttpClient::receivedData to call a slot which has been delayed.
 	 */
-	static bool callSlot (SlotInfo *info, HttpClient *client);
+	static bool callSlot (const SlotInfo &info, HttpClient *client);
 	
 	// 
 	HttpNodePrivate *d_ptr;

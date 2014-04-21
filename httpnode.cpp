@@ -37,8 +37,23 @@ Nuria::SlotInfo::SlotInfo (const Callback &callback)
 	
 }
 
+Nuria::SlotInfo::SlotInfo (const Nuria::SlotInfo &other)
+	: d (other.d)
+{
+	
+}
+
+Nuria::SlotInfo &Nuria::SlotInfo::operator= (const Nuria::SlotInfo &other) {
+	this->d = other.d;
+	return *this;
+}
+
 Nuria::SlotInfo::~SlotInfo () {
-	delete this->d;
+	// 
+}
+
+bool Nuria::SlotInfo::isValid () const {
+	return this->d->callback.isValid ();
 }
 
 Nuria::Callback Nuria::SlotInfo::callback () const {
@@ -103,9 +118,6 @@ Nuria::HttpNode::HttpNode (QObject *parent)
 }
 
 Nuria::HttpNode::~HttpNode () {
-	
-	// Free slot info objects
-	qDeleteAll (this->d_ptr->mySlots);
 	delete this->d_ptr;
 	
 }
@@ -118,35 +130,35 @@ Nuria::HttpNode *Nuria::HttpNode::parentNode () const {
 	return this->d_ptr->parent;
 }
 
-Nuria::SlotInfo *Nuria::HttpNode::connectSlot (const QString &name, const Nuria::Callback &callback) {
+Nuria::SlotInfo Nuria::HttpNode::connectSlot (const QString &name, const Nuria::Callback &callback) {
 	// Sanity check
 	if (name.isEmpty () || !callback.isValid () || this->d_ptr->mySlots.contains (name)) {
-		return 0;
+		return SlotInfo ();
 	}
 	
 	// Create binding
-	SlotInfo *info = new SlotInfo (callback);
+	SlotInfo info (callback);
 	this->d_ptr->mySlots.insert (name, info);
 	
 	return info;
 }
 
-Nuria::SlotInfo *Nuria::HttpNode::connectSlot (const QString &name, QObject *receiver, const char *slot) {
+Nuria::SlotInfo Nuria::HttpNode::connectSlot (const QString &name, QObject *receiver, const char *slot) {
 	
 	// Sanity check
 	if (name.isEmpty () || !receiver || !slot || this->d_ptr->mySlots.contains (name)) {
-		return 0;
+		return SlotInfo ();
 	}
 	
 	// Check for slot
 	const QMetaObject *meta = receiver->metaObject ();
 	int index = meta->indexOfMethod (slot + 1);
 	if (index == -1) {
-		return 0;
+		return SlotInfo ();
 	}
 	
 	// Create binding
-	SlotInfo *info = new SlotInfo (Callback (receiver, slot));
+	SlotInfo info (Callback (receiver, slot));
 	this->d_ptr->mySlots.insert (name, info);
 	
 	return info;
@@ -155,14 +167,13 @@ Nuria::SlotInfo *Nuria::HttpNode::connectSlot (const QString &name, QObject *rec
 bool Nuria::HttpNode::disconnectSlot (const QString &name) {
 	
 	// Find slot info
-	QMap< QString , SlotInfo * >::Iterator it = this->d_ptr->mySlots.find (name);
+	auto it = this->d_ptr->mySlots.find (name);
 	
 	// Break if not found
 	if (it == this->d_ptr->mySlots.end ())
 		return false;
 	
 	// Free internal data and erase the entry
-	delete *it;
 	this->d_ptr->mySlots.erase (it);
 	
 	return true;
@@ -333,13 +344,13 @@ bool Nuria::HttpNode::callSlotByName (const QString &name, HttpClient *client) {
 	}
 	
 	// Host object invalid?
-	SlotInfo *info = it.value ();
-	if (!info->d->callback.isValid ()) {
+	const SlotInfo &info = *it;
+	if (!info.d->callback.isValid ()) {
 		return false;
 	}
 	
 	// Illegal request method?
-	if (!(info->d->allowedVerbs & client->verb ())) {
+	if (!(info.d->allowedVerbs & client->verb ())) {
 		
 		// Kick client with 405
 		client->killConnection (405);
@@ -348,7 +359,7 @@ bool Nuria::HttpNode::callSlotByName (const QString &name, HttpClient *client) {
 	}
 	
 	// Is encryption enforced?
-	if (info->d->forceEncrypted && !client->isConnectionSecure ()) {
+	if (info.forceEncrypted () && !client->isConnectionSecure ()) {
 		client->httpServer ()->redirectClientToUseEncryption (client);
 		return false;
 	}
@@ -359,7 +370,7 @@ bool Nuria::HttpNode::callSlotByName (const QString &name, HttpClient *client) {
 	// Call. If we're in non-streaming mode and the request
 	// method was POST or PUT we delay the call until the
 	// body has been completely received.
-	if (!info->streamPostBody () &&
+	if (!info.streamPostBody () &&
 	    (client->verb () & (HttpClient::POST | HttpClient::PUT))) {
 		
 //		nDebug() << "Delaying call to" << info->slotName ();
@@ -448,13 +459,14 @@ bool Nuria::HttpNode::sendStaticResource (const QStringList &path, int indexInPa
 	return false;
 }
 
-bool Nuria::HttpNode::callSlot (SlotInfo *info, HttpClient *client) {
-	if (!info) {
+bool Nuria::HttpNode::callSlot (const SlotInfo &info, HttpClient *client) {
+	if (!info.isValid ()) {
 		nError() << "Can't invoke a slot without a valid SlotInfo instance.";
 		return false;
 	}
 	
-	info->d->callback (client);
-	return info->d->callback.isValid ();
+	Callback cb = info.callback ();
+	cb (client);
 	
+	return cb.isValid ();
 }

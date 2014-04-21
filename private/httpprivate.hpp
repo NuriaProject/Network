@@ -81,7 +81,7 @@ struct HttpClientPrivate {
 	qint64 pipeMaxlen;
 	
 	// 
-	SlotInfo *slotInfo;
+	SlotInfo slotInfo;
 	
 	// 
 	bool keepConnectionOpen;
@@ -100,11 +100,11 @@ public:
 	
 	// Named 'mySlots' instead of simply 'slots' to circuvement the #define
 	// of 'slots' to '' in qobjectdefs.h
-	QMap< QString , SlotInfo * > mySlots;
+	QMap< QString , SlotInfo > mySlots;
 	
 };
 
-class SlotInfoPrivate {
+class SlotInfoPrivate : public QSharedData {
 public:
 	
 	Callback callback;
