@@ -24,138 +24,16 @@
 #include <QMetaType>
 #include <QMap>
 #include <QUrl>
+#include <QNetworkCookie>
 
 class QTcpSocket;
 
 namespace Nuria {
 
 class HttpClientPrivate;
-class HttpCookiePrivate;
 class HttpServer;
 class HttpNode;
 class SlotInfo;
-
-/**
- * \brief The HttpCookie class represents a server-side cookie.
- * This class is only used in combination with HttpClient::setCookie.
- * It allows the user to specify more details of the cookie.
- */
-class NURIA_NETWORK_EXPORT HttpCookie {
-public:
-	
-	/**
-	 * Constructs a default instance with \a name and \a value.
-	 * Initializes the other properties to default values.
-	 * - \a expires = \c 0
-	 * - \a maxAge = \a invalid
-	 * - \a domain = \a empty
-	 * - \a path = "/"
-	 * - \a port = \c -1 (\a invalid)
-	 * - \a httpOnly = \c false
-	 * - \a secure = \c false
-	 * \note By default, the cookie is a session cookie.
-	 */
-	HttpCookie (const QByteArray &name, const QByteArray &value);
-	
-	~HttpCookie ();
-	
-	/**
-	 * Returns the cookie name.
-	 */
-	const QByteArray &name () const;
-	
-	/**
-	 * Returns the value.
-	 */
-	const QByteArray &value () const;
-	
-	/**
-	 * Returns the expire date and time.
-	 */
-	const QDateTime &expires () const;
-	
-	/**
-	 * Returns the time to live in seconds.
-	 * A value of \c 0 means this is a session cookie.
-	 */
-	qint64 maxAge () const;
-	
-	/**
-	 * Returns the domain name of this cookie.
-	 */
-	const QString &domain () const;
-	
-	/**
-	 * Returns the cookie path.
-	 */
-	const QString &path () const;
-	
-	/**
-	 * Returns the port.
-	 */
-	int port () const;
-	
-	/**
-	 * Returns if this cookie should only be delivered to http requests.
-	 */
-	bool httpOnly () const;
-	
-	/**
-	 * Returns if this cookie must only be transfered over secured
-	 * connections.
-	 */
-	bool secure () const;
-	
-	/**
-	 * Sets the cookie name.
-	 */
-	void setName (const QByteArray &name);
-	
-	/**
-	 * Sets the value.
-	 */
-	void setValue (const QByteArray &value);
-	
-	/**
-	 * Sets the expire date and time.
-	 */
-	void setExpires (const QDateTime &dateTime);
-	
-	/**
-	 * Sets the time to live in seconds.
-	 * A value of \c 0 means this is a session cookie.
-	 */
-	void setMaxAge (qint64 age) const;
-	
-	/**
-	 * Sets the domain name of this cookie.
-	 */
-	void setDomain (const QString &domain);
-	
-	/**
-	 * Sets the cookie path.
-	 */
-	void setPath (const QString &path);
-	
-	/**
-	 * Sets the port.
-	 */
-	void setPort (int port);
-	
-	/**
-	 * Sets if this cookie should only be delivered to http requests.
-	 */
-	void setHttpOnly (bool onlyHttp);
-	
-	/**
-	 * Sets if this cookie must only be transfered over secured connections.
-	 */
-	void setSecure (bool secure);
-	
-private:
-	HttpCookiePrivate *d_ptr;
-	
-};
 
 /**
  * \brief The HttpClient class represents a connection to a client.
@@ -574,7 +452,7 @@ public:
 	 * \note This is only possible as long the HTTP response hasn't been
 	 * sent yet.
 	 */
-	void setCookie (const Nuria::HttpCookie &cookie);
+	void setCookie (const QNetworkCookie &cookie);
 	
 	/**
 	 * Removes a cookie. If the cookie is known by the client it will

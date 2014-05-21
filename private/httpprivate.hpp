@@ -24,24 +24,6 @@
 
 namespace Nuria {
 
-// Private data structure of Nuria::HttpCookie
-struct HttpCookiePrivate {
-	
-	QByteArray name;
-	QByteArray value;
-	
-	QDateTime expires;
-	qint64 maxAge;
-	
-	QString domain;
-	QString path;
-	int port;
-	
-	bool httpOnly;
-	bool secure;
-	
-};
-
 // Private data structure of Nuria::HttpClient
 struct HttpClientPrivate {
 	
