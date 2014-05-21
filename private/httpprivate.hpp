@@ -32,41 +32,41 @@ struct HttpClientPrivate {
 	HttpServer *server;
 	
 	//
-	bool headerReady;
-	bool headerSent;
+	bool headerReady = false;
+	bool headerSent = false;
 	
 	//
-	Nuria::HttpClient::HttpVersion requestVersion;
-	Nuria::HttpClient::HttpVerb requestType;
+	HttpClient::HttpVersion requestVersion = HttpClient::HttpUnknown;
+	HttpClient::HttpVerb requestType = HttpClient::InvalidVerb;
 	QMultiMap< QByteArray, QByteArray > requestHeaders;
 	QMultiMap< QByteArray, QByteArray > responseHeaders;
-	Nuria::HttpClient::Cookies requestCookies;
-	Nuria::HttpClient::Cookies responseCookies;
+	HttpClient::Cookies requestCookies;
+	HttpClient::Cookies responseCookies;
 	
 	QUrl path;
 	
-	int responseCode;
+	int responseCode = 200;
 	QString responseName;
 	
-	int bufferMemorySize; // Defaults to 16kB
-	QIODevice *bufferDevice;
-	qint64 postBodyLength;
-	qint64 postBodyTransferred;
-	bool chunkedBodyTransfer; // For 100-continue stuff
+	int bufferMemorySize = (16 * 1024);
+	QIODevice *bufferDevice = nullptr;
+	qint64 postBodyLength = -1;
+	qint64 postBodyTransferred = 0;
+	bool chunkedBodyTransfer = false; // For 100-continue stuff
 	
-	qint64 rangeStart;
-	qint64 rangeEnd;
-	qint64 contentLength;
+	qint64 rangeStart = -1;
+	qint64 rangeEnd = -1;
+	qint64 contentLength = -1;
 	
 	//
-	QIODevice *pipeDevice;
-	qint64 pipeMaxlen;
+	QIODevice *pipeDevice = nullptr;
+	qint64 pipeMaxlen = -1;
 	
 	// 
 	SlotInfo slotInfo;
 	
 	// 
-	bool keepConnectionOpen;
+	bool keepConnectionOpen = false;
 	
 };
 

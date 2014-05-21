@@ -52,22 +52,6 @@ Nuria::HttpClient::HttpClient (QTcpSocket *socket, HttpServer *server)
 	this->d_ptr = new HttpClientPrivate;
 	this->d_ptr->socket = socket;
 	this->d_ptr->server = server;
-	this->d_ptr->headerReady = false;
-	this->d_ptr->headerSent = false;
-	this->d_ptr->requestVersion = HttpUnknown;
-	this->d_ptr->requestType = InvalidVerb;
-	this->d_ptr->responseCode = 200;
-	this->d_ptr->bufferMemorySize = 16384;
-	this->d_ptr->bufferDevice = 0;
-	this->d_ptr->postBodyLength = -1;
-	this->d_ptr->postBodyTransferred = 0;
-	this->d_ptr->chunkedBodyTransfer = false;
-	this->d_ptr->rangeStart = -1;
-	this->d_ptr->rangeEnd = -1;
-	this->d_ptr->contentLength = -1;
-	this->d_ptr->pipeDevice = 0;
-	this->d_ptr->pipeMaxlen = -1;
-	this->d_ptr->keepConnectionOpen = false;
 	
 	// Reparent socket
 	this->d_ptr->socket->setParent (this);
@@ -147,7 +131,7 @@ void Nuria::HttpClient::readRequestCookies () {
 	// Get 'Cookie' headers
 	// Note: As of RFC6265 a client is only allowed to send a single Cookie
 	// header. Thing is, some clients probably don't care and do it anyway.
-	QList< QByteArray > headers = this->d_ptr->requestHeaders.values ("Cookie"); //QByteArray::fromRawData ("Cookie", 7));
+	QList< QByteArray > headers = this->d_ptr->requestHeaders.values ("Cookie");
 	for (int i = 0; i < headers.length (); i++) {
 		
 		// 
