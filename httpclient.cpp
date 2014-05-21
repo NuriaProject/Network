@@ -952,86 +952,15 @@ bool Nuria::HttpClient::hasCookie (const QByteArray &name) {
 	return this->d_ptr->requestCookies.contains (name);
 }
 
-/** Helper function. Arguments that are passed by pointer may be NULL. */
-static QByteArray constructSetCookieHeader (const QByteArray &value,
-					    const QDateTime *expires, qint64 maxAge, 
-					    const QString *domain, const QString *path, 
-					    int port, bool httpOnly, bool secure) {
-	QByteArray data;
-	QByteArray encoded = value.toPercentEncoding ();
-	
-	// Append 'encoded' to data.
-	data = encoded; // Allocate some extra bytes.
-	data.reserve (encoded.length () + 32);
-	
-	// Expiry date
-	if (expires && expires->isValid ()) {
-		char buf[64];
-		
-		// We need the datetime in UTC
-		QDateTime utc = expires->toUTC ();
-	        QDate date = utc.date ();
-	        QTime time = utc.time ();
-		
-		// Construct
-		::snprintf (buf, sizeof(buf),
-			    "; Expires=%s, %02i-%s-%i %02i:%02i:%02i GMT",
-			    g_days[date.dayOfWeek () - 1], date.day (),
-			    g_months[date.month () - 1], date.year (), time.hour (),
-			    time.minute (), time.second ());
-		
-		data.append (buf);
-		
-	}
-	
-	// Maximum age
-	if (maxAge > 0) {
-		char buf[32];
-		::snprintf (buf, sizeof(buf), "; Max-Age=%lli", maxAge);
-		data.append (buf);
-	}
-	
-	// Domain
-	if (domain && !domain->isEmpty ()) {
-		data.append ("; Domain=");
-		data.append (domain->toLatin1 ());
-	}
-	
-	// Path
-	if (path && !path->isEmpty ()) {
-		data.append ("; Path=");
-		data.append (path->toLatin1 ());
-	} else {
-		data.append ("; Path=/");
-	}
-	
-	// Port
-	if (port > 0) {
-		char buf[32];
-		::snprintf (buf, sizeof(buf), "; Port=%i", port);
-		data.append (buf);
-	}
-	
-	// HttpOnly
-	if (httpOnly) {
-		data.append ("; HttpOnly");
-	}
-	
-	// Secure
-	if (secure) {
-		data.append ("; Secure");
-	}
-	
-	// Done.
-	data.squeeze ();
-	return data;
-}
-
 void Nuria::HttpClient::setCookie (const QByteArray &name, const QByteArray &value,
 				   const QDateTime &expires, bool secure) {
 	
 	// Construct
-	QByteArray data = constructSetCookieHeader (value, &expires, 0, 0, 0, 0, false, secure);
+	QNetworkCookie cookie(name);
+	cookie.setValue(value);
+	cookie.setExpirationDate(expires);
+	cookie.setSecure(secure);
+	QByteArray data = cookie.toRawForm(QNetworkCookie::Full);
 	
 	// Store
 	this->d_ptr->responseCookies.insert (name, data);
@@ -1042,20 +971,23 @@ void Nuria::HttpClient::setCookie (const QByteArray &name, const QByteArray &val
 				   qint64 maxAge, bool secure) {
 	
 	// Construct
-	QByteArray data = constructSetCookieHeader (value, 0, maxAge, 0, 0, 0, false, secure);
+	QNetworkCookie cookie(name);
+	cookie.setValue(value);
+	if (maxAge > 0) {
+		cookie.setExpirationDate(QDateTime::currentDateTime().addMSecs(maxAge));
+	}
+	cookie.setSecure(secure);
+	QByteArray data = cookie.toRawForm(QNetworkCookie::Full);
 	
 	// Store
 	this->d_ptr->responseCookies.insert (name, data);
 	
 }
 
-void Nuria::HttpClient::setCookie (const Nuria::HttpCookie &cookie) {
+void Nuria::HttpClient::setCookie (const QNetworkCookie &cookie) {
 	
 	// Construct
-	QByteArray data = constructSetCookieHeader (cookie.value (), &cookie.expires (),
-						    cookie.maxAge (), &cookie.domain (),
-						    &cookie.path (), cookie.port (),
-						    cookie.httpOnly (), cookie.secure ());
+	QByteArray data = cookie.toRawForm(QNetworkCookie::Full);
 	
 	// Store
 	this->d_ptr->responseCookies.insert (cookie.name (), data);
@@ -1074,7 +1006,9 @@ void Nuria::HttpClient::removeCookie (const QByteArray &name) {
 		// This should work on most clients. The old value is replaced
 		// with garbage and the 'expires' header points to 1970 which
 		// is a long time ago. Smart browsers should get that hint.
-		this->d_ptr->responseCookies.insert (name, "; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT");
+		QNetworkCookie cookie(name);
+		cookie.setExpirationDate(QDateTime::fromMSecsSinceEpoch(0));
+		this->d_ptr->responseCookies.insert (name, cookie.toRawForm(QNetworkCookie::Full));
 		
 	}
 	
@@ -1173,8 +1107,6 @@ bool Nuria::HttpClient::sendResponseHeader () {
 		
 		for (; it != end; ++it) {
 			this->d_ptr->socket->write ("\r\nSet-Cookie: ");
-			this->d_ptr->socket->write (it.key ());
-			this->d_ptr->socket->write ("=");
 			this->d_ptr->socket->write (it.value ());
 			
 		}
@@ -1339,99 +1271,4 @@ Nuria::HttpClient::~HttpClient () {
 	
 	delete this->d_ptr;
 	
-}
-
-Nuria::HttpCookie::HttpCookie (const QByteArray &name, const QByteArray &value) {
-	
-	// 
-	this->d_ptr = new Nuria::HttpCookiePrivate;
-	this->d_ptr->name = name;
-	this->d_ptr->value = value;
-	
-	this->d_ptr->maxAge = 0;
-	
-	this->d_ptr->path = QLatin1String ("/");
-	this->d_ptr->port = 0;
-	
-	this->d_ptr->httpOnly = false;
-	this->d_ptr->secure = false;
-	
-}
-
-Nuria::HttpCookie::~HttpCookie () {
-	
-	delete this->d_ptr;
-	
-}
-
-const QByteArray &Nuria::HttpCookie::name () const {
-	return this->d_ptr->name;
-}
-
-const QByteArray &Nuria::HttpCookie::value () const {
-	return this->d_ptr->value;
-}
-
-const QDateTime &Nuria::HttpCookie::expires () const {
-	return this->d_ptr->expires;
-}
-
-qint64 Nuria::HttpCookie::maxAge () const {
-	return this->d_ptr->maxAge;
-}
-
-const QString &Nuria::HttpCookie::domain () const {
-	return this->d_ptr->domain;
-}
-
-const QString &Nuria::HttpCookie::path () const {
-	return this->d_ptr->path;
-}
-
-int Nuria::HttpCookie::port () const {
-	return this->d_ptr->port;
-}
-
-bool Nuria::HttpCookie::httpOnly () const {
-	return this->d_ptr->httpOnly;
-}
-
-bool Nuria::HttpCookie::secure () const {
-	return this->d_ptr->secure;
-}
-
-void Nuria::HttpCookie::setName (const QByteArray &name) {
-	this->d_ptr->name = name;
-}
-
-void Nuria::HttpCookie::setValue (const QByteArray &value) {
-	this->d_ptr->value = value;
-}
-
-void Nuria::HttpCookie::setExpires (const QDateTime &dateTime) {
-	this->d_ptr->expires = dateTime;
-}
-
-void Nuria::HttpCookie::setMaxAge (qint64 age) const {
-	this->d_ptr->maxAge = age;
-}
-
-void Nuria::HttpCookie::setDomain (const QString &domain) {
-	this->d_ptr->domain = domain;
-}
-
-void Nuria::HttpCookie::setPath (const QString &path) {
-	this->d_ptr->path = path;
-}
-
-void Nuria::HttpCookie::setPort (int port) {
-	this->d_ptr->port = port;
-}
-
-void Nuria::HttpCookie::setHttpOnly (bool onlyHttp) {
-	this->d_ptr->httpOnly = onlyHttp;
-}
-
-void Nuria::HttpCookie::setSecure (bool secure) {
-	this->d_ptr->secure = secure;
 }
