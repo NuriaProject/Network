@@ -18,14 +18,16 @@ SOURCES += httpclient.cpp \
     httpnode.cpp \
     httpserver.cpp \
     sslserver.cpp \
-    restfulhttpnode.cpp
+    restfulhttpnode.cpp \
+    httpparser.cpp
 
 GLOBAL_HEADERS = network_global.hpp \
     httpclient.hpp \
     httpnode.hpp \
     restfulhttpnode.hpp \
     httpserver.hpp \
-    sslserver.hpp
+    sslserver.hpp \
+    httpparser.hpp
     
 PRIVATE_HEADERS = \
     private/httpprivate.hpp
