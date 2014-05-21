@@ -932,14 +932,13 @@ void Nuria::HttpClient::setCookie (const QByteArray &name, const QByteArray &val
 				   const QDateTime &expires, bool secure) {
 	
 	// Construct
-	QNetworkCookie cookie(name);
-	cookie.setValue(value);
-	cookie.setExpirationDate(expires);
-	cookie.setSecure(secure);
-	QByteArray data = cookie.toRawForm(QNetworkCookie::Full);
+	QNetworkCookie cookie (name);
+	cookie.setValue (value);
+	cookie.setExpirationDate (expires);
+	cookie.setSecure (secure);
 	
 	// Store
-	this->d_ptr->responseCookies.insert (name, data);
+	setCookie (cookie);
 	
 }
 
@@ -947,17 +946,16 @@ void Nuria::HttpClient::setCookie (const QByteArray &name, const QByteArray &val
 				   qint64 maxAge, bool secure) {
 	
 	// Construct
-	QNetworkCookie cookie(name);
-	cookie.setValue(value);
+	QNetworkCookie cookie (name);
+	cookie.setSecure (secure);
+	cookie.setValue (value);
+	
 	if (maxAge > 0) {
-		cookie.setExpirationDate(QDateTime::currentDateTime().addMSecs(maxAge));
+		cookie.setExpirationDate (QDateTime::currentDateTime ().addMSecs (maxAge));
 	}
-	cookie.setSecure(secure);
-	QByteArray data = cookie.toRawForm(QNetworkCookie::Full);
 	
 	// Store
-	this->d_ptr->responseCookies.insert (name, data);
-	
+	setCookie (cookie);
 }
 
 void Nuria::HttpClient::setCookie (const QNetworkCookie &cookie) {
@@ -1237,7 +1235,6 @@ QByteArray Nuria::HttpClient::httpHeaderName (HttpClient::HttpHeader header) {
 	// We should never reach this.
 	return QByteArray ();
 }
-
 
 Nuria::HttpClient::~HttpClient () {
 #ifdef QT_DEBUG

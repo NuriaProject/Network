@@ -19,12 +19,12 @@
 #define NURIA_HTTPCLIENT_HPP
 
 #include "network_global.hpp"
+#include <QNetworkCookie>
 #include <QHostAddress>
 #include <QIODevice>
 #include <QMetaType>
 #include <QMap>
 #include <QUrl>
-#include <QNetworkCookie>
 
 class QTcpSocket;
 
