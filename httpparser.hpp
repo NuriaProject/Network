@@ -58,6 +58,13 @@ public:
 	 * \a version didn't match any known version string.
 	 */
 	HttpClient::HttpVersion parseVersion (const QByteArray &version);
+	
+	/**
+	 * Tries to parse \a verb. Returns \c HttpClient::InvalidVerb if
+	 * \a verb didn't match any known HTTP verb.
+	 */
+	HttpClient::HttpVerb parseVerb (const QByteArray &verb);
+	
 };
 
 }

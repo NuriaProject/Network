@@ -99,3 +99,27 @@ Nuria::HttpClient::HttpVersion Nuria::HttpParser::parseVersion (const QByteArray
 	
 	return HttpClient::HttpUnknown;
 }
+
+Nuria::HttpClient::HttpVerb Nuria::HttpParser::parseVerb (const QByteArray &verb) {
+	if (verb == "GET") {
+		return HttpClient::GET;
+	}
+	
+	if (verb == "POST") {
+		return HttpClient::POST;
+	}
+	
+	if (verb == "HEAD") {
+		return HttpClient::HEAD;
+	}
+	
+	if (verb == "PUT") {
+		return HttpClient::PUT;
+	}
+	
+	if (verb == "DELETE") {
+		return HttpClient::DELETE;
+	}
+	
+	return HttpClient::InvalidVerb;
+}
