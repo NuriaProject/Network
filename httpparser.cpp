@@ -123,3 +123,36 @@ Nuria::HttpClient::HttpVerb Nuria::HttpParser::parseVerb (const QByteArray &verb
 	
 	return HttpClient::InvalidVerb;
 }
+
+bool Nuria::HttpParser::parseRangeHeaderValue (const QByteArray &value, int &begin, int &end) {
+	// Format: "bytes=<Begin>-<End>"
+	
+	if (!value.startsWith ("bytes=")) {
+		return false;
+	}
+	
+	// Index
+	int beginOfBegin = 6; // After 'bytes='
+	int endOfBegin = value.indexOf ('-', beginOfBegin);
+	int beginLength = endOfBegin - beginOfBegin;
+	int beginOfEnd = endOfBegin + 1;
+	int endLength = value.length () - beginOfEnd;
+	
+	// Sanity check
+	if (endOfBegin == -1 || beginLength < 1 || endLength < 1) {
+		return false;
+	}
+	
+	// Read parts
+	QByteArray beginData = QByteArray::fromRawData (value.constData () + beginOfBegin, beginLength);
+	QByteArray endData = QByteArray::fromRawData (value.constData () + beginOfEnd, endLength);
+	
+	// Parse integers
+	bool beginOk = false;
+	bool endOk = false;
+	begin = beginData.toInt (&beginOk);
+	end = endData.toInt (&endOk);
+	
+	// Done.
+	return (beginOk && endOk && begin >= 0 && end >= 0 && begin < end);
+}

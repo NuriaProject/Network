@@ -65,6 +65,13 @@ public:
 	 */
 	HttpClient::HttpVerb parseVerb (const QByteArray &verb);
 	
+	/**
+	 * Parses \a value which contains the value of a "Range" HTTP header.
+	 * On success, it sets \a begin and \a end to the given values and
+	 * returns \c true.
+	 */
+	bool parseRangeHeaderValue (const QByteArray &value, int &begin, int &end);
+	
 };
 
 }
