@@ -598,6 +598,9 @@ private:
 }
 
 Q_DECLARE_OPERATORS_FOR_FLAGS(Nuria::HttpClient::HttpVerbs)
+Q_DECLARE_METATYPE(Nuria::HttpClient::HttpVersion)
+Q_DECLARE_METATYPE(Nuria::HttpClient::HttpVerbs)
+Q_DECLARE_METATYPE(Nuria::HttpClient::HttpVerb)
 Q_DECLARE_METATYPE(Nuria::HttpClient*)
 
 #endif // NURIA_HTTPCLIENT_HPP
