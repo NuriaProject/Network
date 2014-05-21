@@ -168,12 +168,12 @@ public:
 	 * Returns the HTTP name for a statuscode.
 	 * If none is known for \a code, an empty string is returned.
 	 */
-	static const char *httpStatusCodeName (int code);
+	static QByteArray httpStatusCodeName (int code);
 	
 	/**
 	 * Returns the name of a HTTP standard header.
 	 */
-	static const char *httpHeaderName (HttpHeader header);
+	static QByteArray httpHeaderName (HttpHeader header);
 	
 	/** Returns \a true if the client has sent the complete header. */
 	bool isHeaderReady () const;
@@ -508,11 +508,14 @@ public slots:
 	
 	/**
 	 * Kills the connection to the client immediatly with \a error as HTTP
-	 * error code. This is only possible until the response header has
-	 * been sent. If the response header has already been sent, the connection
-	 * to the client will simply be destroyed.
+	 * error code. If \a cause is not empty, it will be sent to the client.
+	 * Else a appropriate cause is chosen automatically based on \a error.
+	 * 
+	 * This is only possible until the response header has been sent. If the
+	 * response header has already been sent, the connection to the client
+	 * will simply be destroyed.
 	 */
-	bool killConnection (int error, QString str = QString());
+	bool killConnection (int error, const QString &cause = QString());
 	
 	/**
 	 * Explicitly sends a response header to the client. Fails if the

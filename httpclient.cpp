@@ -40,14 +40,6 @@ static const char *g_days[] = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" 
 static const char *g_months[] = { "Jan", "Feb", "Mar", "Apr", "Mai", "Jun",
 				  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
-inline QByteArray httpHeaderBytes (Nuria::HttpClient::HttpHeader header) {
-	const char *data = Nuria::HttpClient::httpHeaderName (header);
-	
-	// Avoid a deep-copy as data is constant anyway.
-	// Also respect the trailing \0 byte.
-	return QByteArray::fromRawData (data, qstrlen (data) + 1);
-}
-
 Nuria::HttpClient::HttpClient (QTcpSocket *socket, HttpServer *server)
 	: QIODevice (server)
 {
@@ -100,17 +92,17 @@ Nuria::HttpClient::HttpClient (QTcpSocket *socket, HttpServer *server)
 	}
 	
 	// Insert default response headers
-	this->d_ptr->responseHeaders.insert (httpHeaderBytes (HeaderConnection), "Close");
+	this->d_ptr->responseHeaders.insert (httpHeaderName (HeaderConnection), "Close");
 	
 }
 
 bool Nuria::HttpClient::readRequestHeaders () {
 	
 	// Read Range header
-	if (this->d_ptr->requestHeaders.contains (httpHeaderBytes (HeaderRange))) {
+	if (this->d_ptr->requestHeaders.contains (httpHeaderName (HeaderRange))) {
 		// "Range: bytes=500-1234"
 		
-		QByteArray value = this->d_ptr->requestHeaders.value (httpHeaderBytes (HeaderRange));
+		QByteArray value = this->d_ptr->requestHeaders.value (httpHeaderName (HeaderRange));
 		int begin = value.indexOf ('=') + 1;
 		
 		if (begin == 0) {
@@ -662,7 +654,7 @@ bool Nuria::HttpClient::hasRequestHeader (const QByteArray &key) const {
 }
 
 bool Nuria::HttpClient::hasRequestHeader (Nuria::HttpClient::HttpHeader header) const {
-	return this->d_ptr->requestHeaders.contains (httpHeaderBytes (header));
+	return this->d_ptr->requestHeaders.contains (httpHeaderName (header));
 	
 }
 
@@ -671,7 +663,7 @@ QByteArray Nuria::HttpClient::requestHeader (const QByteArray &key) const {
 }
 
 QByteArray Nuria::HttpClient::requestHeader (Nuria::HttpClient::HttpHeader header) const {
-	return this->d_ptr->requestHeaders.value (httpHeaderBytes (header));
+	return this->d_ptr->requestHeaders.value (httpHeaderName (header));
 }
 
 QList< QByteArray > Nuria::HttpClient::requestHeaders (const QByteArray &key) const {
@@ -679,7 +671,7 @@ QList< QByteArray > Nuria::HttpClient::requestHeaders (const QByteArray &key) co
 }
 
 QList< QByteArray > Nuria::HttpClient::requestHeaders (Nuria::HttpClient::HttpHeader header) const {
-	return this->d_ptr->requestHeaders.values (httpHeaderBytes (header));
+	return this->d_ptr->requestHeaders.values (httpHeaderName (header));
 }
 
 const QMultiMap< QByteArray, QByteArray > &Nuria::HttpClient::requestHeaders () const {
@@ -691,7 +683,7 @@ bool Nuria::HttpClient::hasResponseHeader (const QByteArray &key) const {
 }
 
 bool Nuria::HttpClient::hasResponseHeader (HttpClient::HttpHeader header) const {
-	return this->d_ptr->responseHeaders.contains (httpHeaderBytes (header));
+	return this->d_ptr->responseHeaders.contains (httpHeaderName (header));
 }
 
 const QMultiMap< QByteArray, QByteArray > &Nuria::HttpClient::responseHeaders () const {
@@ -703,7 +695,7 @@ QList< QByteArray > Nuria::HttpClient::responseHeaders (const QByteArray &key) c
 }
 
 QList< QByteArray > Nuria::HttpClient::responseHeaders (Nuria::HttpClient::HttpHeader header) const {
-	return this->d_ptr->responseHeaders.values (httpHeaderBytes (header));
+	return this->d_ptr->responseHeaders.values (httpHeaderName (header));
 }
 
 bool Nuria::HttpClient::setResponseHeader (const QByteArray &key, const QByteArray &value, bool append) {
@@ -726,7 +718,7 @@ bool Nuria::HttpClient::setResponseHeader (Nuria::HttpClient::HttpHeader header,
 	if (this->d_ptr->headerSent)
 		return false;
 	
-	QByteArray key = httpHeaderBytes (header);
+	QByteArray key = httpHeaderName (header);
 	
 	if (!append) {
 		this->d_ptr->responseHeaders.remove (key);
@@ -771,7 +763,7 @@ bool Nuria::HttpClient::pipe (QIODevice *device, qint64 maxlen) {
 	/// TODO: Same goes for a valid Content-Type header. Qt5 will have something for this iirc.
 	QFile *file = qobject_cast< QFile * > (device);
 	if (file && !this->d_ptr->headerSent &&
-	    !this->d_ptr->responseHeaders.contains (httpHeaderBytes (HeaderContentLength))) {
+	    !this->d_ptr->responseHeaders.contains (httpHeaderName (HeaderContentLength))) {
 		
 		setContentLength (file->size ());
 		
@@ -1049,22 +1041,22 @@ bool Nuria::HttpClient::sendResponseHeader () {
 		}
 		
 		// Remove old headers
-		this->d_ptr->responseHeaders.remove (httpHeaderBytes (HeaderContentRange));
-		this->d_ptr->responseHeaders.remove (httpHeaderBytes (HeaderContentLength));
+		this->d_ptr->responseHeaders.remove (httpHeaderName (HeaderContentRange));
+		this->d_ptr->responseHeaders.remove (httpHeaderName (HeaderContentLength));
 		
 		// Store header
-		this->d_ptr->responseHeaders.insert (httpHeaderBytes (HeaderContentRange), range);
+		this->d_ptr->responseHeaders.insert (httpHeaderName (HeaderContentRange), range);
 		
 		// Adjust Content-Length header
 		QByteArray contentLen = QByteArray::number (this->d_ptr->rangeEnd - this->d_ptr->rangeStart);
-		this->d_ptr->responseHeaders.insert (httpHeaderBytes (HeaderContentLength), contentLen);
+		this->d_ptr->responseHeaders.insert (httpHeaderName (HeaderContentLength), contentLen);
 		
 	} else if (this->d_ptr->contentLength != -1) {
 		
-		this->d_ptr->responseHeaders.remove (httpHeaderBytes (HeaderContentLength));
+		this->d_ptr->responseHeaders.remove (httpHeaderName (HeaderContentLength));
 		
 		// No range response
-		this->d_ptr->responseHeaders.insert (httpHeaderBytes (HeaderContentLength),
+		this->d_ptr->responseHeaders.insert (httpHeaderName (HeaderContentLength),
 						QByteArray::number (this->d_ptr->contentLength));
 		
 	}
@@ -1114,7 +1106,7 @@ bool Nuria::HttpClient::sendResponseHeader () {
 	}
 	
 	// Send a Date header
-	if (!this->d_ptr->responseHeaders.contains (httpHeaderBytes (HeaderDate))) {
+	if (!this->d_ptr->responseHeaders.contains (httpHeaderName (HeaderDate))) {
 		
 		char string[40];
 		tm gmt;
@@ -1140,17 +1132,18 @@ bool Nuria::HttpClient::sendResponseHeader () {
 	
 }
 
-bool Nuria::HttpClient::killConnection (int error, QString str) {
+bool Nuria::HttpClient::killConnection (int error, const QString &cause) {
 	
 	if (!this->d_ptr->socket->isOpen ())
 		return false;
 	
 	// Send (really) minimal error response
 	if (!this->d_ptr->headerSent) {
+		QByteArray message = cause.toLatin1 ();
 		
 		// Get status code name if nothing was passed.
-		if (str.isEmpty ()) {
-			str = QString::fromLatin1 (httpStatusCodeName (error));
+		if (cause.isEmpty ()) {
+			message = httpStatusCodeName (error);
 		}
 		
 		if (this->d_ptr->requestVersion == Http1_0) {
@@ -1161,9 +1154,9 @@ bool Nuria::HttpClient::killConnection (int error, QString str) {
 		
 		this->d_ptr->socket->write (QByteArray::number (error));
 		this->d_ptr->socket->putChar (' ');
-		this->d_ptr->socket->write (str.toLatin1 ());
+		this->d_ptr->socket->write (message);
 		this->d_ptr->socket->write ("\r\n\r\n");
-		this->d_ptr->socket->write (str.toLatin1 ());
+		this->d_ptr->socket->write (message);
 	}
 	
 	// Close connection
@@ -1176,91 +1169,89 @@ bool Nuria::HttpClient::killConnection (int error, QString str) {
 }
 
 
-const char *Nuria::HttpClient::httpStatusCodeName (int code) {
+QByteArray Nuria::HttpClient::httpStatusCodeName (int code) {
 	
 	switch (code) {
-	case 100: return "Continue";
-	case 101: return "Switching Protocols";
-	case 200: return "OK";
-	case 201: return "Created";
-	case 202: return "Accepted";
-	case 203: return "Non-Authorative Information";
-	case 204: return "No Content";
-	case 205: return "Reset Content";
-	case 206: return "Partial Content";
-	case 300: return "Multiple Choices";
-	case 301: return "Moved Permanently";
-	case 302: return "Found";
-	case 303: return "See Other";
-	case 304: return "Not Modified";
-	case 305: return "Use Proxy";
-	case 307: return "Temporary Redirect";
-	case 400: return "Bad Request";
-	case 401: return "Unauthorized";
-	case 402: return "Payment Required";
-	case 403: return "Forbidden";
-	case 404: return "Not Found";
-	case 405: return "Method Not Allowed";
-	case 406: return "Not Acceptable";
-	case 407: return "Proxy Authentication Required";
-	case 408: return "Request Timeout";
-	case 409: return "Conflict";
-	case 410: return "Gone";
-	case 411: return "Length Required";
-	case 412: return "Precondition Failed";
-	case 413: return "Request Entity Too Large";
-	case 414: return "Request-URI Too Long";
-	case 415: return "Unsupported Media Type";
-	case 416: return "Requested Range Not Satisfiable";
-	case 417: return "Expectation Failed";
-	case 418: return "I'm a teapot"; // See RFC 2324
-	case 500: return "Internal Server Error";
-	case 501: return "Not Implemented";
-	case 502: return "Bad Gateway";
-	case 503: return "Service Unavailable";
-	case 504: return "Gateway Timeout";
-	case 505: return "HTTP Version Not Supported";
+	case 100: return QByteArrayLiteral("Continue");
+	case 101: return QByteArrayLiteral("Switching Protocols");
+	case 200: return QByteArrayLiteral("OK");
+	case 201: return QByteArrayLiteral("Created");
+	case 202: return QByteArrayLiteral("Accepted");
+	case 203: return QByteArrayLiteral("Non-Authorative Information");
+	case 204: return QByteArrayLiteral("No Content");
+	case 205: return QByteArrayLiteral("Reset Content");
+	case 206: return QByteArrayLiteral("Partial Content");
+	case 300: return QByteArrayLiteral("Multiple Choices");
+	case 301: return QByteArrayLiteral("Moved Permanently");
+	case 302: return QByteArrayLiteral("Found");
+	case 303: return QByteArrayLiteral("See Other");
+	case 304: return QByteArrayLiteral("Not Modified");
+	case 305: return QByteArrayLiteral("Use Proxy");
+	case 307: return QByteArrayLiteral("Temporary Redirect");
+	case 400: return QByteArrayLiteral("Bad Request");
+	case 401: return QByteArrayLiteral("Unauthorized");
+	case 402: return QByteArrayLiteral("Payment Required");
+	case 403: return QByteArrayLiteral("Forbidden");
+	case 404: return QByteArrayLiteral("Not Found");
+	case 405: return QByteArrayLiteral("Method Not Allowed");
+	case 406: return QByteArrayLiteral("Not Acceptable");
+	case 407: return QByteArrayLiteral("Proxy Authentication Required");
+	case 408: return QByteArrayLiteral("Request Timeout");
+	case 409: return QByteArrayLiteral("Conflict");
+	case 410: return QByteArrayLiteral("Gone");
+	case 411: return QByteArrayLiteral("Length Required");
+	case 412: return QByteArrayLiteral("Precondition Failed");
+	case 413: return QByteArrayLiteral("Request Entity Too Large");
+	case 414: return QByteArrayLiteral("Request-URI Too Long");
+	case 415: return QByteArrayLiteral("Unsupported Media Type");
+	case 416: return QByteArrayLiteral("Requested Range Not Satisfiable");
+	case 417: return QByteArrayLiteral("Expectation Failed");
+	case 418: return QByteArrayLiteral("I'm a teapot"); // See RFC 2324
+	case 500: return QByteArrayLiteral("Internal Server Error");
+	case 501: return QByteArrayLiteral("Not Implemented");
+	case 502: return QByteArrayLiteral("Bad Gateway");
+	case 503: return QByteArrayLiteral("Service Unavailable");
+	case 504: return QByteArrayLiteral("Gateway Timeout");
+	case 505: return QByteArrayLiteral("HTTP Version Not Supported");
 	}
 	
 	// Unknown code, return empty string
-	return "";
+	return QByteArray ();
 	
 }
 
-const char *Nuria::HttpClient::httpHeaderName (HttpClient::HttpHeader header) {
+QByteArray Nuria::HttpClient::httpHeaderName (HttpClient::HttpHeader header) {
 	
 	switch (header) {
-	case HeaderCacheControl: return "Cache-Control";
-	case HeaderContentLength: return "Content-Length";
-	case HeaderContentType: return "Content-Type";
-	case HeaderConnection: return "Connection";
-	case HeaderDate: return "Date";
-	case HeaderHost: return "Host";
-	case HeaderUserAgent: return "User-Agent";
-	case HeaderAccept: return "Accept";
-	case HeaderAcceptCharset: return "Accept-Charset";
-	case HeaderAcceptEncoding: return "Accept-Encoding";
-	case HeaderAcceptLanguage: return "Accept-Language";
-	case HeaderAuthorization: return "Authorization";
-	case HeaderCookie: return "Cookie";
-	case HeaderRange: return "Range";
-	case HeaderReferer: return "Referer";
-	case HeaderDoNotTrack: return "Do-Not-Track";
-	case HeaderContentEncoding: return "Content-Encoding";
-	case HeaderContentLanguage: return "Content-Language";
-	case HeaderContentDisposition: return "Disposition";
-	case HeaderContentRange: return "Content-Range";
-	case HeaderLastModified: return "Last-Modified";
-	case HeaderRefresh: return "Refresh";
-	case HeaderSetCookie: return "Set-Cookie";
-	case HeaderTransferEncoding: return "Transfer-Encoding";
-	case HeaderLocation: return "Location";
+	case HeaderCacheControl: return QByteArrayLiteral("Cache-Control");
+	case HeaderContentLength: return QByteArrayLiteral("Content-Length");
+	case HeaderContentType: return QByteArrayLiteral("Content-Type");
+	case HeaderConnection: return QByteArrayLiteral("Connection");
+	case HeaderDate: return QByteArrayLiteral("Date");
+	case HeaderHost: return QByteArrayLiteral("Host");
+	case HeaderUserAgent: return QByteArrayLiteral("User-Agent");
+	case HeaderAccept: return QByteArrayLiteral("Accept");
+	case HeaderAcceptCharset: return QByteArrayLiteral("Accept-Charset");
+	case HeaderAcceptEncoding: return QByteArrayLiteral("Accept-Encoding");
+	case HeaderAcceptLanguage: return QByteArrayLiteral("Accept-Language");
+	case HeaderAuthorization: return QByteArrayLiteral("Authorization");
+	case HeaderCookie: return QByteArrayLiteral("Cookie");
+	case HeaderRange: return QByteArrayLiteral("Range");
+	case HeaderReferer: return QByteArrayLiteral("Referer");
+	case HeaderDoNotTrack: return QByteArrayLiteral("Do-Not-Track");
+	case HeaderContentEncoding: return QByteArrayLiteral("Content-Encoding");
+	case HeaderContentLanguage: return QByteArrayLiteral("Content-Language");
+	case HeaderContentDisposition: return QByteArrayLiteral("Disposition");
+	case HeaderContentRange: return QByteArrayLiteral("Content-Range");
+	case HeaderLastModified: return QByteArrayLiteral("Last-Modified");
+	case HeaderRefresh: return QByteArrayLiteral("Refresh");
+	case HeaderSetCookie: return QByteArrayLiteral("Set-Cookie");
+	case HeaderTransferEncoding: return QByteArrayLiteral("Transfer-Encoding");
+	case HeaderLocation: return QByteArrayLiteral("Location");
 	};
 	
-	// Won't be called ever .. unless someone adds an entry into the
-	// HttpHeader enum and forgets to add a case in the switch above.
-	abort (); // Surprise!
-	return "";
+	// We should never reach this.
+	return QByteArray ();
 }
 
 
