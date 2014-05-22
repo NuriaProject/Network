@@ -29,6 +29,7 @@
 // We need gmtime_r
 #include <ctime>
 
+#include "httpparser.hpp"
 #include "httpserver.hpp"
 #include "httpnode.hpp"
 #include <debug.hpp>
@@ -83,38 +84,12 @@ Nuria::HttpClient::HttpClient (QTcpSocket *socket, HttpServer *server)
 bool Nuria::HttpClient::readRequestHeaders () {
 	
 	// Read Range header
-	if (this->d_ptr->requestHeaders.contains (httpHeaderName (HeaderRange))) {
-		// "Range: bytes=500-1234"
+	auto it = this->d_ptr->requestHeaders.constFind (httpHeaderName (HeaderRange));
+	if (it != this->d_ptr->requestHeaders.constEnd ()) {
+		HttpParser parser;
 		
-		QByteArray value = this->d_ptr->requestHeaders.value (httpHeaderName (HeaderRange));
-		int begin = value.indexOf ('=') + 1;
-		
-		if (begin == 0) {
-			return false;
-		}
-		
-		int end = value.indexOf ('-', begin);
-		if (end == -1) {
-			return false;
-		}
-		
-		// 
-		bool startOk = false;
-		bool endOk = false;
-		
-		// 
-		QByteArray rawStart = value.mid (begin, end - begin);
-		QByteArray rawEnd = value.mid (end + 1);
-		
-		this->d_ptr->rangeStart = rawStart.toLongLong (&startOk);
-		this->d_ptr->rangeEnd = rawEnd.toLongLong (&endOk);
-		
-		// Failed?
-		if (!startOk || !endOk || this->d_ptr->rangeStart < 0 ||
-		    this->d_ptr->rangeEnd <= this->d_ptr->rangeStart) {
-			return false;
-		}
-		
+		QByteArray value = *it;
+		return parser.parseRangeHeaderValue (value, this->d_ptr->rangeStart, this->d_ptr->rangeEnd);
 	}
 	
 	// Read cookies
@@ -320,26 +295,8 @@ void Nuria::HttpClient::clientDisconnected () {
 	
 }
 
-/**
- * Helper function for Nuria::HttpClient::receivedData().
- * Takes a key name of a Http header and 'corrects' the case,
- * so 'content-length' becomes 'Content-Length'.
- */
-static void correctHeaderKeyCase (QByteArray &key) {
-	
-	char *data = key.data ();
-	for (int i = 0; data[i]; i++) {
-		
-		// Wrong case for the first character (after a dash)?
-		if (islower (data[i]) && (i == 0 || data[i - 1] == '-')) {
-			data[i] = toupper (data[i]);
-		}
-		
-	}
-	
-}
-
 void Nuria::HttpClient::receivedData () {
+	HttpParser parser;
 	
 	// Has the HTTP header been received from the client?
 	if (this->d_ptr->headerReady) {
@@ -392,22 +349,13 @@ void Nuria::HttpClient::receivedData () {
 	
 	// Parse header line
 	while (this->d_ptr->socket->canReadLine ()) {
-		
 		QByteArray raw = this->d_ptr->socket->readLine (1024);
 		
 		// A line should end in \r\n, but also check for \n.
-		if (raw.endsWith ("\r\n")) {
-			raw.chop (2);
-		} else if (raw.endsWith ('\n')) {
-			// Not a HTTP conform request, but if it's the only problem
-			// we simply ignore it.
-			raw.chop (1);
-		} else {
-			
+		if (parser.removeTrailingNewline (raw)) {
 			// Line too long, kill connection
 			killConnection (400);
 			return;
-			
 		}
 		
 		// If the line is empty, the header is complete.
@@ -463,32 +411,19 @@ void Nuria::HttpClient::receivedData () {
 		
 		// Is this the first line?
 		if (this->d_ptr->requestVersion == HttpUnknown) {
+			QByteArray verb;
+			QByteArray url;
+			QByteArray version;
 			
-			// The line should look like:
-			// <Verb> <URL> HTTP/<Version>
-			
-			int startUrl = raw.indexOf (' ');
-			int startVersion = raw.lastIndexOf (' ');
-			
-			// Bad line, kill client
-			if (startUrl == -1 || startUrl > startVersion) {
+			// Parse first line ..
+			if (!parser.parseFirstLine (raw, verb, url, version)) {
 				killConnection (400);
 				return;
 			}
 			
 			// Parse verb
-			QByteArray verb = raw.left (startUrl);
-			if (!qstrcmp (verb, "GET")) {
-				this->d_ptr->requestType = GET;
-			} else if (!qstrcmp (verb, "POST")) {
-				this->d_ptr->requestType = POST;
-			} else if (!qstrcmp (verb, "HEAD")) {
-				this->d_ptr->requestType = HEAD;
-			} else if (!qstrcmp (verb, "PUT")) {
-				this->d_ptr->requestType = PUT;
-			} else if (!qstrcmp (verb, "DELETE")) {
-				this->d_ptr->requestType = DELETE;
-			} else {
+			this->d_ptr->requestType = parser.parseVerb (verb);
+			if (this->d_ptr->requestType == InvalidVerb) {
 				
 				// Unknown verb, kill connection
 				killConnection (501);
@@ -497,22 +432,13 @@ void Nuria::HttpClient::receivedData () {
 			}
 			
 			// Parse HTTP version
-			QByteArray version = raw.right (3);
-			if (!qstrcmp (version, "1.0")) {
-				this->d_ptr->requestVersion = Http1_0;
-			} else if (!qstrcmp (version, "1.1")) {
-				this->d_ptr->requestVersion = Http1_1;
-			} else {
-				
-				// Unknown version, kill connection
+			this->d_ptr->requestVersion = parser.parseVersion (version);
+			if (this->d_ptr->requestVersion == HttpUnknown) {
 				killConnection (505);
 				return;
-				
 			}
 			
 			// Read requested URL
-			startUrl++; // Skip space
-			QByteArray url = raw.mid (startUrl, startVersion - startUrl);
 			
 			// Dummy to keep QUrl happy
 			url.prepend ("http://localhost");
@@ -524,22 +450,15 @@ void Nuria::HttpClient::receivedData () {
 		}
 		
 		// Split the line to get the "<name>: <value>" pair
-		int beginOfValue = raw.indexOf (": ");
-		
-		// Not a valid request, abort
-		if (beginOfValue == -1) {
+		QByteArray key;
+		QByteArray value;
+		if (!parser.parseHeaderLine (raw, key, value)) {
 			killConnection (400);
+			return;
 		}
 		
-		// Get the key and value
-		QByteArray key = raw.left (beginOfValue);
-		QByteArray value = raw.mid (beginOfValue + 2);
-		
-		// Make sure that keys are case-correct.
-		correctHeaderKeyCase (key);
-		
 		// Store
-		this->d_ptr->requestHeaders.insert (key, value);
+		this->d_ptr->requestHeaders.insert (parser.correctHeaderKeyCase (key), value);
 		
 	}
 	
