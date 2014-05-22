@@ -40,6 +40,12 @@ public:
 	~HttpParser ();
 	
 	/**
+	 * Removes trailing newline characters according to HTTP.
+	 * Returns \c false if there were no newline characters.
+	 */
+	bool removeTrailingNewline (QByteArray &data);
+	
+	/**
 	 * Parses the first line from a HTTP request header from \a data and
 	 * lets \a verb, \a path and \a version point to the specific parts in
 	 * \a data. Returns \c true on success.
@@ -70,8 +76,13 @@ public:
 	 * On success, it sets \a begin and \a end to the given values and
 	 * returns \c true.
 	 */
-	bool parseRangeHeaderValue (const QByteArray &value, int &begin, int &end);
+	bool parseRangeHeaderValue (const QByteArray &value, qint64 &begin, qint64 &end);
 	
+	/**
+	 * Takes a key name of a http header and 'corrects' the case,
+	 * so 'content-length' becomes 'Content-Length'.
+	 */
+	QByteArray correctHeaderKeyCase (QByteArray key);
 };
 
 }

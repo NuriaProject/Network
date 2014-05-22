@@ -25,6 +25,18 @@ Nuria::HttpParser::~HttpParser () {
 	
 }
 
+bool Nuria::HttpParser::removeTrailingNewline (QByteArray &data) {
+	if (data.endsWith ("\r\n")) {
+		data.chop (2);
+	} else if (data.endsWith ('\n')) {
+		data.chop (1);
+	} else {
+		return false;
+	}
+	
+	return true;
+}
+
 bool Nuria::HttpParser::parseFirstLine (const QByteArray &data, QByteArray &verb,
 					QByteArray &path, QByteArray &version) {
 	// Format: "<VERB> <Path> HTTP/<Version>"
@@ -124,7 +136,7 @@ Nuria::HttpClient::HttpVerb Nuria::HttpParser::parseVerb (const QByteArray &verb
 	return HttpClient::InvalidVerb;
 }
 
-bool Nuria::HttpParser::parseRangeHeaderValue (const QByteArray &value, int &begin, int &end) {
+bool Nuria::HttpParser::parseRangeHeaderValue (const QByteArray &value, qint64 &begin, qint64 &end) {
 	// Format: "bytes=<Begin>-<End>"
 	
 	if (!value.startsWith ("bytes=")) {
@@ -150,9 +162,20 @@ bool Nuria::HttpParser::parseRangeHeaderValue (const QByteArray &value, int &beg
 	// Parse integers
 	bool beginOk = false;
 	bool endOk = false;
-	begin = beginData.toInt (&beginOk);
-	end = endData.toInt (&endOk);
+	begin = beginData.toLongLong (&beginOk);
+	end = endData.toLongLong (&endOk);
 	
 	// Done.
 	return (beginOk && endOk && begin >= 0 && end >= 0 && begin < end);
+}
+
+QByteArray Nuria::HttpParser::correctHeaderKeyCase (QByteArray key) {
+	for (int i = 0; i < key.length (); i++) {
+		if (islower (key.at (i)) && (i == 0 || key.at (i - 1) == '-')) {
+			key[i] = toupper (key.at (i));
+		}
+		
+	}
+	
+	return key;
 }
