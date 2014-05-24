@@ -21,7 +21,8 @@ SOURCES += httpclient.cpp \
     restfulhttpnode.cpp \
     httpparser.cpp \
     httptransport.cpp \
-    httptcptransport.cpp
+    httptcptransport.cpp \
+    httpwriter.cpp
 
 GLOBAL_HEADERS = network_global.hpp \
     httpclient.hpp \
@@ -31,7 +32,8 @@ GLOBAL_HEADERS = network_global.hpp \
     sslserver.hpp \
     httpparser.hpp \
     httptransport.hpp \
-    httptcptransport.hpp
+    httptcptransport.hpp \
+    httpwriter.hpp
     
 PRIVATE_HEADERS = \
     private/httpprivate.hpp
