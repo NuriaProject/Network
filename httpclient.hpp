@@ -163,6 +163,9 @@ public:
 		
 	};
 	
+	/** Map used to store HTTP headers in a name -> value fashion. */
+	typedef QMultiMap< QByteArray, QByteArray > HeaderMap;
+	
 	/**
 	 * Constructs a new HttpClient instance which uses \a transport as
 	 * communication back-end. Ownership of \a transport is transferred
@@ -238,7 +241,7 @@ public:
 	QList< QByteArray > requestHeaders (HttpHeader header) const;
 	
 	/** Returns a map of received request headers. */
-	const QMultiMap< QByteArray, QByteArray > &requestHeaders () const;
+	const HeaderMap &requestHeaders () const;
 	
 	/** Returns \a true when \a key has a value in the response header */
 	bool hasResponseHeader (const QByteArray &key) const;
@@ -249,7 +252,7 @@ public:
 	/**
 	 * Returns the current response headers.
 	 */
-	const QMultiMap< QByteArray, QByteArray > &responseHeaders () const;
+	const HeaderMap &responseHeaders () const;
 	
 	/**
 	 * Returns the response headers with key \a key.
@@ -281,7 +284,7 @@ public:
 	 * Sets the response header map.
 	 * \sa setResponseHeader
 	 */
-	bool setResponseHeaders (const QMultiMap< QByteArray, QByteArray > &headers);
+	bool setResponseHeaders (const HeaderMap &headers);
 	
 	/**
 	 * Takes \a device and pipes its contents into the client socket.

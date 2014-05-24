@@ -38,8 +38,8 @@ struct HttpClientPrivate {
 	//
 	HttpClient::HttpVersion requestVersion = HttpClient::HttpUnknown;
 	HttpClient::HttpVerb requestType = HttpClient::InvalidVerb;
-	QMultiMap< QByteArray, QByteArray > requestHeaders;
-	QMultiMap< QByteArray, QByteArray > responseHeaders;
+	HttpClient::HeaderMap requestHeaders;
+	HttpClient::HeaderMap responseHeaders;
 	HttpClient::Cookies requestCookies;
 	HttpClient::Cookies responseCookies;
 	

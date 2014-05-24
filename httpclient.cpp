@@ -546,7 +546,7 @@ QList< QByteArray > Nuria::HttpClient::requestHeaders (Nuria::HttpClient::HttpHe
 	return this->d_ptr->requestHeaders.values (httpHeaderName (header));
 }
 
-const QMultiMap< QByteArray, QByteArray > &Nuria::HttpClient::requestHeaders () const {
+const Nuria::HttpClient::HeaderMap &Nuria::HttpClient::requestHeaders () const {
 	return this->d_ptr->requestHeaders;
 }
 
@@ -558,7 +558,7 @@ bool Nuria::HttpClient::hasResponseHeader (HttpClient::HttpHeader header) const 
 	return this->d_ptr->responseHeaders.contains (httpHeaderName (header));
 }
 
-const QMultiMap< QByteArray, QByteArray > &Nuria::HttpClient::responseHeaders () const {
+const Nuria::HttpClient::HeaderMap &Nuria::HttpClient::responseHeaders () const {
 	return this->d_ptr->responseHeaders;
 }
 
@@ -589,7 +589,7 @@ bool Nuria::HttpClient::setResponseHeader (Nuria::HttpClient::HttpHeader header,
 	return setResponseHeader (httpHeaderName (header), value, append);
 }
 
-bool Nuria::HttpClient::setResponseHeaders (const QMultiMap< QByteArray, QByteArray > &headers) {
+bool Nuria::HttpClient::setResponseHeaders (const HeaderMap &headers) {
 	
 	if (this->d_ptr->headerSent)
 		return false;
