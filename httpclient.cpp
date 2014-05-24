@@ -376,6 +376,7 @@ void Nuria::HttpClient::clientDisconnected () {
 	setOpenMode (QIODevice::NotOpen);
 	
 	// Emit disconnected signal
+	emit aboutToClose ();
 	emit disconnected ();
 	
 	// and delete this later on.
@@ -701,20 +702,8 @@ void Nuria::HttpClient::close () {
 	if (openMode () == QIODevice::NotOpen)
 		return;
 	
-	// Change the access flag
 	setOpenMode (QIODevice::NotOpen);
-	
-	// If the write buffer is empty just close the socket.
-	if (this->d_ptr->transport->bytesToWrite () == 0) {
-		this->d_ptr->transport->close ();
-		return;
-	}
-	
-	// If there is still data to be written, connect the correct
-	// signal with the forceClose() slot.
-	connect (this->d_ptr->transport, SIGNAL(bytesWritten(qint64)),
-		 SLOT(forceClose()), Qt::UniqueConnection);
-	
+	this->d_ptr->transport->close ();
 }
 
 void Nuria::HttpClient::forceClose () {

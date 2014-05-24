@@ -50,3 +50,7 @@ QHostAddress Nuria::HttpTransport::peerAddress () const {
 quint16 Nuria::HttpTransport::peerPort () const {
 	return 0;
 }
+
+bool Nuria::HttpTransport::flush () {
+	return true;
+}

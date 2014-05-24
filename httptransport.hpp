@@ -97,12 +97,19 @@ public:
 	 */
 	virtual quint16 peerPort () const;
 	
+public slots:
+	
 	/**
 	 * Instructs the underlying transport to send any pending data to the
-	 * client now.
+	 * client now. The default implementation always returns \c true.
 	 */
-	virtual void flush () = 0;
+	virtual bool flush ();
 	
+	/**
+	 * Closes the underlying transport immediately, discarding any data
+	 * in the send buffer (If one exists).
+	 */
+	virtual void forceClose ();
 	
 };
 

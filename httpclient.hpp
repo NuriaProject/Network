@@ -36,7 +36,8 @@ class SlotInfo;
 
 /**
  * \brief The HttpClient class represents a connection to a client.
- * This class is used whenever interaction with the http client is necessary.
+ * 
+ * This class is used whenever interaction with the HTTP client is necessary.
  * It provides a simple way to transfer data from and to the client.
  * 
  * \note As of now, HttpClient doesn't support <tt>Connection: keep-alive</tt>.
@@ -161,6 +162,13 @@ public:
 		HeaderLocation
 		
 	};
+	
+	/**
+	 * Constructs a new HttpClient instance which uses \a transport as
+	 * communication back-end. Ownership of \a transport is transferred
+	 * to the HttpClient instance.
+	 */
+	explicit HttpClient (HttpTransport *transport, HttpServer *server);
 	
 	/** Destructor. */
 	virtual ~HttpClient ();
@@ -574,8 +582,6 @@ protected:
 private:
 	friend class HttpServer;
 	friend class HttpNode;
-	
-	explicit HttpClient (HttpTransport *transport, HttpServer *server);
 	
 	/**
 	 * Parses the request headers. Returns \c true on success.

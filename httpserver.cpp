@@ -22,6 +22,7 @@
 #include <QTcpServer>
 #include <QDir>
 
+#include "httptcptransport.hpp"
 #include "httpclient.hpp"
 #include "sslserver.hpp"
 #include "httpnode.hpp"
@@ -177,8 +178,9 @@ void Nuria::HttpServer::newClient () {
 	while (server->hasPendingConnections ()) {
 		
 		QTcpSocket *socket = server->nextPendingConnection ();
-//		HttpClient *client = new HttpClient (socket, this);
-//		Q_UNUSED(client)
+		HttpTcpTransport *transport = new HttpTcpTransport (socket, this);
+		HttpClient *client = new HttpClient (transport, this);
+		Q_UNUSED(client)
 		
 	}
 	
