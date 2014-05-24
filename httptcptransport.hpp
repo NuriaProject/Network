@@ -46,19 +46,19 @@ public:
 	QHostAddress peerAddress () const override;
 	quint16 peerPort () const override;
 	
-	bool isSequential () const;
-	bool open (OpenMode mode);
-	void close ();
-	qint64 pos () const;
-	qint64 size () const;
-	bool seek (qint64 pos);
-	bool atEnd () const;
-	bool reset ();
-	qint64 bytesAvailable () const;
-	qint64 bytesToWrite () const;
-	bool canReadLine () const;
-	bool waitForReadyRead (int msecs);
-	bool waitForBytesWritten (int msecs);
+	bool isSequential () const override;
+	bool open (OpenMode mode) override;
+	void close () override;
+	qint64 pos () const override;
+	qint64 size () const override;
+	bool seek (qint64 pos) override;
+	bool atEnd () const override;
+	bool reset () override;
+	qint64 bytesAvailable () const override;
+	qint64 bytesToWrite () const override;
+	bool canReadLine () const override;
+	bool waitForReadyRead (int msecs) override;
+	bool waitForBytesWritten (int msecs) override;
 
 public slots:
 	bool flush () override;
@@ -69,7 +69,7 @@ private slots:
 	
 protected:
 	qint64 readData (char *data, qint64 maxlen) override;
-	qint64 readLineData(char *data, qint64 maxlen);
+	qint64 readLineData (char *data, qint64 maxlen) override;
 	qint64 writeData (const char *data, qint64 len) override;
 	
 private:
