@@ -28,7 +28,7 @@ namespace Nuria {
 struct HttpClientPrivate {
 	
 	// 
-	QTcpSocket *socket;
+	HttpTransport *transport;
 	HttpServer *server;
 	
 	//

@@ -177,8 +177,8 @@ void Nuria::HttpServer::newClient () {
 	while (server->hasPendingConnections ()) {
 		
 		QTcpSocket *socket = server->nextPendingConnection ();
-		HttpClient *client = new HttpClient (socket, this);
-		Q_UNUSED(client)
+//		HttpClient *client = new HttpClient (socket, this);
+//		Q_UNUSED(client)
 		
 	}
 	

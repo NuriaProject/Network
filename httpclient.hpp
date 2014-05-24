@@ -26,11 +26,10 @@
 #include <QMap>
 #include <QUrl>
 
-class QTcpSocket;
-
 namespace Nuria {
 
 class HttpClientPrivate;
+class HttpTransport;
 class HttpServer;
 class HttpNode;
 class SlotInfo;
@@ -94,8 +93,6 @@ class NURIA_NETWORK_EXPORT HttpClient : public QIODevice {
 	Q_FLAGS(HttpVerbs)
 public:
 	
-	virtual ~HttpClient ();
-	
 	/**
 	 * The HttpVersion enum lists the possible HTTP versions.
 	 */
@@ -150,6 +147,7 @@ public:
 		HeaderRange,
 		HeaderReferer,
 		HeaderDoNotTrack,
+		HeaderExpect,
 		
 		/* Response only */
 		HeaderContentEncoding = 2000,
@@ -163,6 +161,14 @@ public:
 		HeaderLocation
 		
 	};
+	
+	/** Destructor. */
+	virtual ~HttpClient ();
+	
+	/**
+	 * Returns the internal HttpTransport instance.
+	 */
+	HttpTransport *transport () const;
 	
 	/**
 	 * Returns the HTTP name for a statuscode.
@@ -358,12 +364,7 @@ public:
 	 * See QAbstractSocket::peerAddress.
 	 */
 	QHostAddress peerAddress () const;
-	
-	/**
-	 * See QAbstractSocket::peerName.
-	 */
-	QString peerName () const;
-	
+		
 	/**
 	 * See QAbstractSocket::peerPort.
 	 */
@@ -381,7 +382,8 @@ public:
 	void setResponseCode (int code);
 	
 	/**
-	 * Returns \c true if the connection is secured using SSL.
+	 * Returns \c true if the connection is secured.
+	 * \sa HttpTransport::isSecure
 	 */
 	bool isConnectionSecure () const;
 	
@@ -390,10 +392,8 @@ public:
 	 */
 	HttpServer *httpServer () const;
 	
-	/**
-	 * 
-	 */
-	typedef QMap< QByteArray, QByteArray > Cookies;
+	/** List of cookies. */
+	typedef QMap< QByteArray, QNetworkCookie > Cookies;
 	
 	/**
 	 * Returns all received cookies from the client.
@@ -408,7 +408,7 @@ public:
 	 * \note This method refers to cookies received from the client.
 	 * \sa cookies hasCookie
 	 */
-	QByteArray cookie (const QByteArray &name);
+	QNetworkCookie cookie (const QByteArray &name);
 	
 	/**
 	 * Returns if there is a cookie \a name.
@@ -575,12 +575,12 @@ private:
 	friend class HttpServer;
 	friend class HttpNode;
 	
-	explicit HttpClient (QTcpSocket *socket, HttpServer *server);
+	explicit HttpClient (HttpTransport *transport, HttpServer *server);
 	
 	/**
 	 * Parses the request headers. Returns \c true on success.
 	 */
-	bool readRequestHeaders ();
+	bool readRangeRequestHeader ();
 	
 	/**
 	 * Reads the cookies from the request headers if not already done.
@@ -589,6 +589,12 @@ private:
 	 * here.
 	 */
 	void readRequestCookies ();
+	
+	bool readAllAvailableHeaderLines ();
+	bool readFirstLine (const QByteArray &line);
+	bool readHeader (const QByteArray &line);
+	bool isReceivedHeaderHttp11Compliant ();
+	bool verifyCompleteHeader ();
 	
 	// 
 	HttpClientPrivate *d_ptr;
