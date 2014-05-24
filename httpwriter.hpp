@@ -33,19 +33,63 @@ public:
 	HttpWriter ();
 	
 	/**
+	 * Returns the full HTTP name of \a version.
+	 */
+	QByteArray httpVersionToString (HttpClient::HttpVersion version);
+	
+	/**
 	 * Returns the first line for a HTTP response header.
 	 * If \a message is empty, HttpClient::httpStatusCodeName() will be used
 	 * to generate an appropriate message.
 	 */
-	QByteArray writeResponseLine (int statusCode, const QByteArray &message);
+	QByteArray writeResponseLine (HttpClient::HttpVersion version, int statusCode,
+				      const QByteArray &message);
 	
 	/**
 	 * Returns Set-Cookie header linedata from \a cookies.
 	 */
 	QByteArray writeSetCookies (const HttpClient::Cookies &cookies);
 	
-//	void addComplianceHeaders (HttpClient::
+	/**
+	 * Writes the value for a Set-Cookie HTTP header from \a cookie.
+	 * \note This method is compliant with RFC 2109
+	 * \note As of Qt5.3, QNetworkCookie::toRawForm() is buggy which is the
+	 * reason we're doing it in here manually.
+	 */
+	QByteArray writeSetCookieValue (const QNetworkCookie &cookie);
 	
+	/**
+	 * Takes \a headers and turns it into a HTTP header string.
+	 */
+	QByteArray writeHttpHeaders (const HttpClient::HeaderMap &headers);
+	
+	/**
+	 * Returns the formatted value for a Date header based on \a dateTime.
+	 * \note \a dateTime is assumed to be in UTC.
+	 */
+	QByteArray dateTimeToHttpDateHeader (const QDateTime &dateTime);
+	
+	/**
+	 * Returns the value for a Range header.
+	 */
+	QByteArray buildRangeHeader (qint64 begin, qint64 end, qint64 totalLength);
+	
+	/**
+	 * Adds missing HTTP headers to \a headers to make it compliant to
+	 * \a version.
+	 */
+	void addComplianceHeaders (HttpClient::HttpVersion version, HttpClient::HeaderMap &headers);
+	
+	/**
+	 * If \a begin is \c -1 and \a totalLength is not \c -1, then a
+	 * \c Content-Length will be put into \a headers. If \a begin and
+	 * \a end are not \c -1, a \c Content-Range header is stored in
+	 * \a headers. If no conditions are met, \a headers is left untouched.
+	 * 
+	 * Existing headers are not changed.
+	 */
+	void applyRangeHeaders (qint64 begin, qint64 end, qint64 totalLength,
+				HttpClient::HeaderMap &headers);
 private:
 	
 };
