@@ -107,7 +107,8 @@ public slots:
 	
 	/**
 	 * Closes the underlying transport immediately, discarding any data
-	 * in the send buffer (If one exists).
+	 * in the send buffer (If one exists). The default implementation
+	 * simply calls close().
 	 */
 	virtual void forceClose ();
 	

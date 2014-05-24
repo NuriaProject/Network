@@ -54,3 +54,7 @@ quint16 Nuria::HttpTransport::peerPort () const {
 bool Nuria::HttpTransport::flush () {
 	return true;
 }
+
+void Nuria::HttpTransport::forceClose () {
+	close ();
+}
