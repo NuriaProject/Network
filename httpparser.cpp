@@ -179,3 +179,39 @@ QByteArray Nuria::HttpParser::correctHeaderKeyCase (QByteArray key) {
 	
 	return key;
 }
+
+bool Nuria::HttpParser::parseCookies (const QByteArray &data, Nuria::HttpClient::Cookies &target) {
+	QList< QNetworkCookie > list = QNetworkCookie::parseCookies (data);
+	
+	for (const QNetworkCookie &cookie : list) {
+		target.insert (cookie.name (), cookie);
+	}
+	
+	return true;
+}
+
+bool Nuria::HttpParser::parseFirstLineFull (const QByteArray &line, Nuria::HttpClient::HttpVerb &verb,
+					    QByteArray &path, Nuria::HttpClient::HttpVersion &version) {
+	QByteArray rawVerb;
+	QByteArray rawVersion;
+	
+	// Parse first line ..
+	if (!parseFirstLine (line, rawVerb, path, rawVersion)) {
+		return false;
+	}
+	
+	// Parse verb
+	verb = parseVerb (rawVerb);
+	if (verb == HttpClient::InvalidVerb) {
+		return false;
+	}
+	
+	// Parse HTTP version
+	version = parseVersion (rawVersion);
+	if (version == HttpClient::HttpUnknown) {
+		return false;
+	}
+	
+	// Done
+	return true;
+}

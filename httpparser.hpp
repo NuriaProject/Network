@@ -52,7 +52,6 @@ public:
 	 */
 	bool parseFirstLine (const QByteArray &data, QByteArray &verb, QByteArray &path,
 			     QByteArray &version);
-	
 	/**
 	 * Parses a single HTTP header line from \a data and puts the result
 	 * into \a name and \a value. Returns \c true on success.
@@ -83,7 +82,22 @@ public:
 	 * so 'content-length' becomes 'Content-Length'.
 	 */
 	QByteArray correctHeaderKeyCase (QByteArray key);
+	
+	/**
+	 * Parses \a data from a 'Cookie' header sent by the client and puts the
+	 * result into \a target. Returns \c true on success.
+	 */
+	bool parseCookies (const QByteArray &data, HttpClient::Cookies &target);
+	
+	/**
+	 * Parses the first line of a HTTP header in \a line. The results are
+	 * put into \a verb, \a path and \a version. If any parser step fails,
+	 * \c false is returned.
+	 */ 
+	bool parseFirstLineFull (const QByteArray &line, HttpClient::HttpVerb &verb,
+				 QByteArray &path, HttpClient::HttpVersion &version);
 };
+
 
 }
 
