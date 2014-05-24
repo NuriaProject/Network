@@ -91,10 +91,10 @@ public:
 	
 	Callback callback;
 	
-	bool streamPostBody;
-	qint64 maxBodyLength;
-	HttpClient::HttpVerbs allowedVerbs;
-	bool forceEncrypted;
+	bool streamPostBody = false;
+	qint64 maxBodyLength = 4096 * 1024; // 4MiB
+	HttpClient::HttpVerbs allowedVerbs = HttpClient::HttpVerbs (0xFF);
+	bool forceEncrypted = false;
 	
 };
 

@@ -30,10 +30,6 @@ Nuria::SlotInfo::SlotInfo (const Callback &callback)
 {
 	
 	this->d->callback = callback;
-	this->d->streamPostBody = false;
-	this->d->maxBodyLength = 4194304;
-	this->d->allowedVerbs = HttpClient::HttpVerbs (0xFF);
-	this->d->forceEncrypted = false;
 	
 }
 

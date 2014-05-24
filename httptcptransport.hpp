@@ -32,6 +32,7 @@ class HttpTcpTransportPrivate;
 class HttpTcpTransport : public HttpTransport {
 	Q_OBJECT
 public:
+	
 	/** Constructor. */
 	explicit HttpTcpTransport (QTcpSocket *socket, QObject *parent = 0);
 	
