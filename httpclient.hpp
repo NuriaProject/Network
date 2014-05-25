@@ -605,12 +605,12 @@ private:
 	bool readFirstLine (const QByteArray &line);
 	bool readHeader (const QByteArray &line);
 	bool isReceivedHeaderHttp11Compliant ();
-	bool readAndReactToPostRequest ();
+	bool verifyPostRequestCompliance ();
 	bool verifyCompleteHeader ();
 	bool invokeRequestedPath ();
 	bool closeConnectionIfNoLongerNeeded ();
 	bool verifyRequestBodyOrClose ();
-	bool verifyRequestContentLength ();
+	bool requestHasPostBody ();
 	
 	/**
 	 * Sends a chunk of the pipeToClient() device to the client.

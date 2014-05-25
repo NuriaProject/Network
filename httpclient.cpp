@@ -127,12 +127,17 @@ bool Nuria::HttpClient::readPostBodyContentLength () {
 	
 	// If there is no Content-Length header, kill the connection
 	if (this->d_ptr->postBodyLength < 0) {
+		killConnection (400);
 		return false;
 	}
 	
 	// Check if the client wants to send too much data.
-	if (this->d_ptr->slotInfo.isValid () &&
-	    this->d_ptr->postBodyLength > this->d_ptr->slotInfo.maxBodyLength ()) {
+	qint64 maxContentLength = 1024 * 1024 * 4;
+	if (this->d_ptr->slotInfo.isValid ()) {
+		maxContentLength = this->d_ptr->slotInfo.maxBodyLength ();
+	}
+	
+	if (this->d_ptr->postBodyLength > maxContentLength) {
 		killConnection (413);
 		return false;
 	}
@@ -143,6 +148,11 @@ bool Nuria::HttpClient::readPostBodyContentLength () {
 
 bool Nuria::HttpClient::send100ContinueIfClientExpectsIt () {
 	static const QByteArray continue100 = QByteArrayLiteral("100-continue");
+	
+	if (this->d_ptr->requestType != POST &&
+	    this->d_ptr->requestType != PUT) {
+		return true;
+	}
 	
 	QByteArray expects = this->d_ptr->requestHeaders.value (httpHeaderName (HeaderExpect));
 	if (expects.isEmpty ()) {
@@ -186,7 +196,7 @@ bool Nuria::HttpClient::readAllAvailableHeaderLines () {
 			return (verifyRequestBodyOrClose () &&
 				verifyCompleteHeader () &&
 				invokeRequestedPath () &&
-				verifyRequestContentLength ());
+				readPostBodyContentLength ());
 			
 		} else if (this->d_ptr->requestVersion == HttpUnknown) {
 			// This is the first line.
@@ -245,23 +255,12 @@ bool Nuria::HttpClient::isReceivedHeaderHttp11Compliant () {
 	return this->d_ptr->requestHeaders.contains (httpHeaderName (HeaderHost));
 }
 
-bool Nuria::HttpClient::readAndReactToPostRequest () {
-	if (this->d_ptr->requestType != POST &&
-	    this->d_ptr->requestType != PUT) {
+bool Nuria::HttpClient::verifyPostRequestCompliance () {
+	if (!requestHasPostBody ()) {
 		return true;
 	}
 	
-	// 
-	if (!readPostBodyContentLength ()) {
-		return false;
-	}
-	
-	// Chunked transfer?
-	if (!send100ContinueIfClientExpectsIt ()) {
-		return false;
-	}
-	
-	return true;
+	return this->d_ptr->requestHeaders.contains (httpHeaderName (HeaderContentLength));
 }
 
 bool Nuria::HttpClient::verifyCompleteHeader () {
@@ -275,7 +274,7 @@ bool Nuria::HttpClient::verifyCompleteHeader () {
 	
 	// Verify header
 	if (!readRangeRequestHeader () || !isReceivedHeaderHttp11Compliant () ||
-	    !readAndReactToPostRequest ()) {
+	    !verifyPostRequestCompliance ()) {
 		killConnection (400);
 		return false;
 	}
@@ -290,9 +289,7 @@ bool Nuria::HttpClient::verifyCompleteHeader () {
 }
 
 bool Nuria::HttpClient::closeConnectionIfNoLongerNeeded () {
-	if (this->d_ptr->requestType != POST &&
-	    this->d_ptr->requestType != PUT &&
-	    !this->d_ptr->keepConnectionOpen) {
+	if (!requestHasPostBody () && !this->d_ptr->keepConnectionOpen) {
 		close ();
 		return true;
 	}
@@ -301,9 +298,7 @@ bool Nuria::HttpClient::closeConnectionIfNoLongerNeeded () {
 }
 
 bool Nuria::HttpClient::verifyRequestBodyOrClose () {
-	if (this->d_ptr->requestType != POST &&
-	    this->d_ptr->requestType != PUT &&
-	    this->d_ptr->transport->bytesAvailable () > 0) {
+	if (!requestHasPostBody () && this->d_ptr->transport->bytesAvailable () > 0) {
 		killConnection (400);
 		return false;
 	}
@@ -311,27 +306,8 @@ bool Nuria::HttpClient::verifyRequestBodyOrClose () {
 	return true;
 }
 
-bool Nuria::HttpClient::verifyRequestContentLength () {
-	if (this->d_ptr->requestType != POST &&
-	    this->d_ptr->requestType != PUT) {
-		return true;
-	}
-	
-	// 
-	qint64 maxContentLength = 1024 * 1024 * 4;
-	qint64 contentLength = parseIntegerHeaderValue (httpHeaderName (HeaderContentLength));
-	
-	// 
-	if (this->d_ptr->slotInfo.isValid ()) {
-		maxContentLength = this->d_ptr->slotInfo.maxBodyLength ();
-	}
-	
-	if (contentLength == -1 || contentLength > maxContentLength) {
-		killConnection (413);
-		return false;
-	}
-	
-	return true;
+bool Nuria::HttpClient::requestHasPostBody () {
+	return (this->d_ptr->requestType == POST || this->d_ptr->requestType == PUT);
 }
 
 bool Nuria::HttpClient::sendPipeChunkToClient () {
@@ -372,7 +348,7 @@ bool Nuria::HttpClient::invokeRequestedPath () {
 	        return false;
 	}
 	
-	closeConnectionIfNoLongerNeeded();
+	closeConnectionIfNoLongerNeeded ();
 	return true;
 }
 
@@ -448,9 +424,10 @@ void Nuria::HttpClient::receivedData () {
 	
 	// Has the HTTP header been received from the client?
 	if (!this->d_ptr->headerReady) {
-		// Parse header line
-		readAllAvailableHeaderLines ();
-		return;
+		if (!readAllAvailableHeaderLines () ||
+		    this->d_ptr->transport->bytesAvailable () == 0) {
+			return;
+		}
 		
 	}
 	
@@ -463,7 +440,7 @@ void Nuria::HttpClient::receivedData () {
 		
 	// Buffer POST data. Kill the connection if something goes wrong.
 	if (!bufferPostBody ()) {
-		killConnection (400);
+		killConnection (413);
 		return;
 	}
 	
