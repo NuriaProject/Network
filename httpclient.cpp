@@ -122,6 +122,11 @@ qint64 Nuria::HttpClient::parseIntegerHeaderValue (const QByteArray &value) {
 }
 
 bool Nuria::HttpClient::readPostBodyContentLength () {
+	if (!requestHasPostBody ()) {
+		return true;
+	}
+	
+	// 
 	QByteArray contentLength = this->d_ptr->requestHeaders.value (httpHeaderName (HeaderContentLength));
 	this->d_ptr->postBodyLength = parseIntegerHeaderValue (contentLength);
 	
@@ -149,8 +154,7 @@ bool Nuria::HttpClient::readPostBodyContentLength () {
 bool Nuria::HttpClient::send100ContinueIfClientExpectsIt () {
 	static const QByteArray continue100 = QByteArrayLiteral("100-continue");
 	
-	if (this->d_ptr->requestType != POST &&
-	    this->d_ptr->requestType != PUT) {
+	if (!requestHasPostBody ()) {
 		return true;
 	}
 	
@@ -170,7 +174,6 @@ bool Nuria::HttpClient::send100ContinueIfClientExpectsIt () {
 	
 	// Respond with '100 Continue'
 	this->d_ptr->transport->write (writer.writeResponseLine (Http1_1, 100, QByteArray ()));
-	this->d_ptr->transport->write ("\r\n");
 	this->d_ptr->transport->flush ();
 	
 	return true;
@@ -193,10 +196,7 @@ bool Nuria::HttpClient::readAllAvailableHeaderLines () {
 			this->d_ptr->headerReady = true;
 			
 			// If the line is empty, the header is complete.
-			return (verifyRequestBodyOrClose () &&
-				verifyCompleteHeader () &&
-				invokeRequestedPath () &&
-				readPostBodyContentLength ());
+			return postProcessRequestHeader ();
 			
 		} else if (this->d_ptr->requestVersion == HttpUnknown) {
 			// This is the first line.
@@ -289,7 +289,8 @@ bool Nuria::HttpClient::verifyCompleteHeader () {
 }
 
 bool Nuria::HttpClient::closeConnectionIfNoLongerNeeded () {
-	if (!requestHasPostBody () && !this->d_ptr->keepConnectionOpen) {
+	if (!requestHasPostBody () && !this->d_ptr->keepConnectionOpen &&
+	    !this->d_ptr->pipeDevice) {
 		close ();
 		return true;
 	}
@@ -308,6 +309,20 @@ bool Nuria::HttpClient::verifyRequestBodyOrClose () {
 
 bool Nuria::HttpClient::requestHasPostBody () {
 	return (this->d_ptr->requestType == POST || this->d_ptr->requestType == PUT);
+}
+
+bool Nuria::HttpClient::postProcessRequestHeader () {
+	if (verifyRequestBodyOrClose () &&
+	    verifyCompleteHeader () &&
+	    invokeRequestedPath () &&
+	    readPostBodyContentLength () &&
+	    send100ContinueIfClientExpectsIt ()) {
+		return true;
+	}
+	
+	// Failed.
+	killConnection (400);
+	return false;
 }
 
 bool Nuria::HttpClient::sendPipeChunkToClient () {
@@ -339,7 +354,12 @@ bool Nuria::HttpClient::sendPipeChunkToClient () {
 		return true;
 	}
 	
-	return (this->d_ptr->pipeMaxlen != 0);
+	// 
+	if (this->d_ptr->pipeMaxlen == 0) {
+		return false;
+	}
+	
+	return !this->d_ptr->pipeDevice->atEnd ();
 }
 
 bool Nuria::HttpClient::invokeRequestedPath () {
@@ -432,8 +452,7 @@ void Nuria::HttpClient::receivedData () {
 	}
 	
 	// Clients sending data outside of a POST or PUT requests are killed.
-	if (this->d_ptr->requestType != POST &&
-	    this->d_ptr->requestType != PUT) {
+	if (!requestHasPostBody ()) {
 		killConnection (400);
 		return;
 	}
@@ -448,9 +467,13 @@ void Nuria::HttpClient::receivedData () {
 	// associated slot if the POST body is complete.
 	if (!(this->d_ptr->slotInfo.isValid () && this->d_ptr->slotInfo.streamPostBody ()) &&
 	    this->d_ptr->postBodyLength == this->d_ptr->postBodyTransferred) {
-		this->d_ptr->bufferDevice->reset ();
-		HttpNode::callSlot (this->d_ptr->slotInfo, this);
+		QProcess *process = qobject_cast< QProcess * > (this->d_ptr->bufferDevice);
 		
+		if (!process) {
+			this->d_ptr->bufferDevice->reset ();
+		}
+		
+		HttpNode::callSlot (this->d_ptr->slotInfo, this);
 		if (!this->d_ptr->keepConnectionOpen) {
 			close ();
 		}
@@ -611,7 +634,6 @@ bool Nuria::HttpClient::pipeToClient (QIODevice *device, qint64 maxlen) {
 	if (file && !this->d_ptr->headerSent &&
 	    !this->d_ptr->responseHeaders.contains (httpHeaderName (HeaderContentLength))) {
 		setContentLength (file->size ());
-		
 	}
 	
 	// Read currently available data

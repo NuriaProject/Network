@@ -542,7 +542,7 @@ public slots:
 	 * buffer will be sent to the client before the socket is closed.
 	 * \sa forceClose
 	 */
-	virtual void close ();
+	void close () override;
 	
 	/**
 	 * Closes the socket without caring about the write buffer.
@@ -611,6 +611,7 @@ private:
 	bool closeConnectionIfNoLongerNeeded ();
 	bool verifyRequestBodyOrClose ();
 	bool requestHasPostBody ();
+	bool postProcessRequestHeader ();
 	
 	/**
 	 * Sends a chunk of the pipeToClient() device to the client.
