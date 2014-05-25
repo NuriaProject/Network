@@ -17,40 +17,32 @@
 
 #include "httpclient.hpp"
 
-#include <QTemporaryFile>
 #include <QSslSocket>
 #include <QTcpSocket>
 #include <QDateTime>
 #include <QProcess>
-#include <QBuffer>
 #include <QTimer>
 #include <QDir>
 
 // We need gmtime_r
 #include <ctime>
 
+#include <temporarybufferdevice.hpp>
 #include "httptransport.hpp"
 #include "httpparser.hpp"
 #include "httpserver.hpp"
+#include "httpwriter.hpp"
 #include "httpnode.hpp"
 #include <debug.hpp>
 
 #include "private/httpprivate.hpp"
 
-// Avoid annoying localized month and day names
-static const char *g_days[] = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
-static const char *g_months[] = { "Jan", "Feb", "Mar", "Apr", "Mai", "Jun",
-				  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
-
 Nuria::HttpClient::HttpClient (HttpTransport *transport, HttpServer *server)
 	: QIODevice (server), d_ptr (new HttpClientPrivate)
 {
 	
-#ifdef QT_DEBUG
-	nDebug() << "Creating" << this;
-#endif
-	
 	// Initialize
+	this->d_ptr->bufferDevice = new TemporaryBufferDevice (this);
 	this->d_ptr->transport = transport;
 	this->d_ptr->server = server;
 	
@@ -68,13 +60,14 @@ Nuria::HttpClient::HttpClient (HttpTransport *transport, HttpServer *server)
 	// Insert default response headers
 	this->d_ptr->responseHeaders.insert (httpHeaderName (HeaderConnection), QByteArrayLiteral("Close"));
 	
+	// If there's already data available, invoke receivedData() later.
+	if (transport->bytesAvailable () > 0) {
+		QMetaObject::invokeMethod (this, "receivedData", Qt::QueuedConnection);
+	}
+	
 }
 
 Nuria::HttpClient::~HttpClient () {
-#ifdef QT_DEBUG
-	nDebug() << "Destroying" << this;
-#endif
-	
 	delete this->d_ptr;
 	
 }
@@ -117,6 +110,62 @@ void Nuria::HttpClient::readRequestCookies () {
 	
 }
 
+qint64 Nuria::HttpClient::parseIntegerHeaderValue (const QByteArray &value) {
+	bool ok = false;
+	
+	if (value.isEmpty ()) {
+		return -1;
+	}
+	
+	qint64 result = value.toLongLong (&ok);
+	return (!ok) ? -1 : result;
+}
+
+bool Nuria::HttpClient::readPostBodyContentLength () {
+	QByteArray contentLength = this->d_ptr->requestHeaders.value (httpHeaderName (HeaderContentLength));
+	this->d_ptr->postBodyLength = parseIntegerHeaderValue (contentLength);
+	
+	// If there is no Content-Length header, kill the connection
+	if (this->d_ptr->postBodyLength < 0) {
+		return false;
+	}
+	
+	// Check if the client wants to send too much data.
+	if (this->d_ptr->slotInfo.isValid () &&
+	    this->d_ptr->postBodyLength > this->d_ptr->slotInfo.maxBodyLength ()) {
+		killConnection (413);
+		return false;
+	}
+	
+	// Everything is fine
+	return true;
+}
+
+bool Nuria::HttpClient::send100ContinueIfClientExpectsIt () {
+	static const QByteArray continue100 = QByteArrayLiteral("100-continue");
+	
+	QByteArray expects = this->d_ptr->requestHeaders.value (httpHeaderName (HeaderExpect));
+	if (expects.isEmpty ()) {
+		return true;
+	}
+	
+	if (expects.toLower () != continue100) {
+		// Unknown value
+		return false;
+	}
+	
+	// Chunked transfer
+	HttpWriter writer;
+	this->d_ptr->chunkedBodyTransfer = true;
+	
+	// Respond with '100 Continue'
+	this->d_ptr->transport->write (writer.writeResponseLine (Http1_1, 100, QByteArray ()));
+	this->d_ptr->transport->write ("\r\n");
+	this->d_ptr->transport->flush ();
+	
+	return true;
+}
+
 bool Nuria::HttpClient::readAllAvailableHeaderLines () {
 	HttpParser parser;
 	
@@ -132,8 +181,7 @@ bool Nuria::HttpClient::readAllAvailableHeaderLines () {
 			
 		} else if (raw.isEmpty ()) {
 			// If the line is empty, the header is complete.
-			verifyCompleteHeader ();
-			return false;
+			return verifyCompleteHeader () && invokeRequestedPath ();
 			
 		} else if (this->d_ptr->requestVersion == HttpUnknown) {
 			// This is the first line.
@@ -192,18 +240,39 @@ bool Nuria::HttpClient::isReceivedHeaderHttp11Compliant () {
 	return this->d_ptr->requestHeaders.contains (httpHeaderName (HeaderHost));
 }
 
-bool Nuria::HttpClient::verifyCompleteHeader () {
-	this->d_ptr->headerReady = true;
+bool Nuria::HttpClient::readAndReactToPostRequest () {
+	if (this->d_ptr->requestType != POST &&
+	    this->d_ptr->requestType != PUT) {
+		return true;
+	}
 	
-	// Verify header
-	if (!readRangeRequestHeader () || !isReceivedHeaderHttp11Compliant ()) {
-		killConnection (400);
+	// 
+	if (!readPostBodyContentLength ()) {
 		return false;
 	}
 	
-	// Try to call the associated slot
-	if (!resolveUrl (this->d_ptr->path)) {
-		killConnection (403);
+	// Chunked transfer?
+	if (!send100ContinueIfClientExpectsIt ()) {
+		return false;
+	}
+	
+	return true;
+}
+
+bool Nuria::HttpClient::verifyCompleteHeader () {
+	this->d_ptr->headerReady = true;
+	
+	// Verify first line
+	if (this->d_ptr->requestVersion == HttpUnknown ||
+	    this->d_ptr->requestType == InvalidVerb ||
+	    this->d_ptr->path.path ().isEmpty ()) {
+		return false;
+	}
+	
+	// Verify header
+	if (!readRangeRequestHeader () || !isReceivedHeaderHttp11Compliant () ||
+	    !readAndReactToPostRequest ()) {
+		killConnection (400);
 		return false;
 	}
 	
@@ -212,21 +281,60 @@ bool Nuria::HttpClient::verifyCompleteHeader () {
 		return false;
 	}
 	
-	// Close the connection if
-	// 1) There is no active pipe
-	// 2) The client didn't use POST or PUT
-	// 3) The connection shouldn't be kept open
-	if (!this->d_ptr->pipeDevice && this->d_ptr->requestType != POST &&
-	    this->d_ptr->requestType != PUT && !this->d_ptr->keepConnectionOpen) {
+	// 
+	return true;
+}
+
+bool Nuria::HttpClient::closeConnectionIfNoLongerNeeded () {
+	if (this->d_ptr->requestType != POST &&
+	    this->d_ptr->requestType != PUT &&
+	    !this->d_ptr->keepConnectionOpen) {
 		close ();
+		return true;
 	}
 	
-	// Recall receivedData() so the readyRead signal is emitted.
-	if (this->d_ptr->requestType == POST || this->d_ptr->requestType == PUT) {
-		receivedData ();
+	return false;
+}
+
+bool Nuria::HttpClient::sendPipeChunkToClient () {
+	enum { MaxChunkSize = 8 * 1024 };
+	
+	// Respect maxLen
+	qint64 toRead = MaxChunkSize;
+	if (this->d_ptr->pipeMaxlen >= 0 && this->d_ptr->pipeMaxlen < MaxChunkSize) {
+		toRead = this->d_ptr->pipeMaxlen;
 	}
 	
 	// 
+	QByteArray data = this->d_ptr->pipeDevice->read (toRead);
+	this->d_ptr->pipeMaxlen -= data.length ();
+	
+	if (data.isEmpty ()) {
+		return false;
+	}
+	
+	// Write data into the client stream
+	sendResponseHeader ();
+	this->d_ptr->transport->write (data);
+	if (!this->d_ptr->pipeDevice->atEnd ()) {
+		
+		// Make sure we only have one connection!
+		connect (this, SIGNAL(bytesWritten(qint64)),
+			 SLOT(pipeToClientReadyRead()), Qt::UniqueConnection);
+		
+		return true;
+	}
+	
+	return (this->d_ptr->pipeMaxlen != 0);
+}
+
+bool Nuria::HttpClient::invokeRequestedPath () {
+	if (!resolveUrl (this->d_ptr->path)) {
+	        killConnection (403);
+	        return false;
+	}
+	
+	closeConnectionIfNoLongerNeeded();
 	return true;
 }
 
@@ -247,7 +355,6 @@ qint64 Nuria::HttpClient::writeData (const char *data, qint64 len) {
 	
 	// Make sure that the response header has been sent
 	sendResponseHeader ();
-	
 	return this->d_ptr->transport->write (data, len);
 	
 }
@@ -258,98 +365,18 @@ bool Nuria::HttpClient::resolveUrl (const QUrl &url) {
 
 bool Nuria::HttpClient::bufferPostBody () {
 	
-	// Parse body length if not already done
-	if (this->d_ptr->postBodyLength < 0) {
-		QByteArray value = this->d_ptr->requestHeaders.value (httpHeaderName (HeaderContentLength));
-		
-		// If there is no Content-Length header, kill the connection
-		if (value.isEmpty ()) {
-			return false;
-		}
-		
-		// Same if the value is not a parsable integer
-		bool ok = false;
-		this->d_ptr->postBodyLength = value.toLongLong (&ok);
-		
-		if (!ok) {
-			return false;
-		}
-		
-		// And last but not least, check if the client wants to send too much data.
-		if (this->d_ptr->slotInfo.isValid () &&
-		    this->d_ptr->postBodyLength > this->d_ptr->slotInfo.maxBodyLength ()) {
-			killConnection (413);
-			return false;
-		}
-		
-		// Chunked transfer?
-		QByteArray expectedHeader = this->d_ptr->requestHeaders.value (httpHeaderName (HeaderExpect));
-		if (!expectedHeader.isEmpty ()) {
-			
-			if (!qstricmp (expectedHeader, "100-continue")) {
-				this->d_ptr->chunkedBodyTransfer = true;
-				
-				// Respond with '100 Continue'
-				this->d_ptr->transport->write ("HTTP/1.1 100 Continue\r\n\r\n");
-				this->d_ptr->transport->flush ();
-				
-			} else {
-				
-				// What's that?
-				return false;
-				
-			}
-			
-		}
-		
-	}
-	
-	// Do we need a new buffer?
-	if (!this->d_ptr->bufferDevice) {
-		
-		// If the clients sends less than m_bufferMemorySize we use a QBuffer.
-		// Else we use a temporary file to store the data.
-		// We also use a in-memory buffer if the user told us to not buffer the data.
-		// This way we can always track how much data has been sent, so the
-		// kill-client-if-sent-too-much mechanism works correctly.
-		if ((this->d_ptr->slotInfo.isValid () && this->d_ptr->slotInfo.streamPostBody ()) ||
-		    this->d_ptr->postBodyLength <= this->d_ptr->bufferMemorySize) {
-			
-			// Create a QByteArray with enough space to contain the complete body.
-			QByteArray data;
-			data.reserve (this->d_ptr->postBodyLength + 1);
-			
-			QBuffer *buffer = new QBuffer (this);
-			buffer->setData (data);
-			
-			buffer->open (QIODevice::ReadWrite);
-			this->d_ptr->bufferDevice = buffer;
-			
-		} else {
-			
-			// We need a temporary file to store the data.
-			QTemporaryFile *file = new QTemporaryFile (this);
-			
-			if (!file->open ()) {
-				nCritical() << "Failed to create temporary file";
-				return false;
-			}
-			
-			this->d_ptr->bufferDevice = file;
-		}
-		
+	// Has the client sent too much?
+	this->d_ptr->postBodyTransferred += this->d_ptr->transport->bytesAvailable ();
+	if (this->d_ptr->postBodyTransferred > this->d_ptr->postBodyLength) {
+		return false;
 	}
 	
 	// Write the received data into the buffer
 	QByteArray data = this->d_ptr->transport->readAll ();
-//	nDebug() << "Received" << data.length () << this->d_ptr->bufferDevice->inherits ("QProcess");
-	
-	this->d_ptr->postBodyTransferred += data.length ();
 	this->d_ptr->bufferDevice->write (data);
 	
 	// Emit postBodyComplete() when the transfer is complete
 	if (this->d_ptr->postBodyTransferred == this->d_ptr->postBodyLength) {
-//		nDebug() << "Body complete.";
 		
 		// If we're piping the body into a process, we need to close
 		// the writing channel for some applications to start their work.
@@ -359,11 +386,6 @@ bool Nuria::HttpClient::bufferPostBody () {
 		}
 		
 		emit postBodyComplete ();
-	} else if (this->d_ptr->postBodyTransferred > this->d_ptr->postBodyLength) {
-		
-		// The client sent too much. Get rid of the liar.
-		return false;
-		
 	}
 	
 	return true;
@@ -394,14 +416,9 @@ void Nuria::HttpClient::receivedData () {
 		
 	}
 	
-	// HTTP header has been received already.
+	// Clients sending data outside of a POST or PUT requests are killed.
 	if (this->d_ptr->requestType != POST &&
 	    this->d_ptr->requestType != PUT) {
-		
-		// In this case we received data after the HTTP header.
-		// And the client used a verb other than POST and PUT,
-		// so it shouldn't send a HTTP body. A good reason for
-		// killing the connection.
 		killConnection (400);
 		return;
 	}
@@ -416,28 +433,20 @@ void Nuria::HttpClient::receivedData () {
 	// associated slot if the POST body is complete.
 	if (!(this->d_ptr->slotInfo.isValid () && this->d_ptr->slotInfo.streamPostBody ()) &&
 	    this->d_ptr->postBodyLength == this->d_ptr->postBodyTransferred) {
-		
-		// Seek the buffer to the beginning
-		this->d_ptr->bufferDevice->seek (0);
-		
-		// Call the slot and close the connection afterwards.
+		this->d_ptr->bufferDevice->reset ();
 		HttpNode::callSlot (this->d_ptr->slotInfo, this);
 		
 		if (!this->d_ptr->keepConnectionOpen) {
 			close ();
 		}
 		
-		return;
-		
+	} else {
+		emit readyRead (); // Streamed mode
 	}
-	
-	// Emit readRead(). Interesting for streaming applications.
-	emit readyRead ();
 	
 }
 
-void Nuria::HttpClient::deviceReadyRead () {
-	static const int maxDataLen = 4096;
+void Nuria::HttpClient::pipeToClientReadyRead () {
 	
 	// If the device is now closed (i.e. not readable), kill the connection
 	if (!this->d_ptr->pipeDevice->isOpen () ||
@@ -446,39 +455,8 @@ void Nuria::HttpClient::deviceReadyRead () {
 		return;
 	}
 	
-	// Respect maxLen
-	qint64 toRead = maxDataLen;
-	
-	if (this->d_ptr->pipeMaxlen >= 0 && this->d_ptr->pipeMaxlen < maxDataLen) {
-		toRead = this->d_ptr->pipeMaxlen;
-	}
-	
-	QByteArray data = this->d_ptr->pipeDevice->read (toRead);
-	this->d_ptr->pipeMaxlen -= toRead;
-	
-	if (!data.isEmpty ()) {
-		
-		sendResponseHeader ();
-		
-		// Write data into the client stream
-		this->d_ptr->transport->write (data);
-//		this->d_ptr->socket->flush ();
-		
-		// If there is still data available connect to bytesWritten()
-		// to send the next chunk of data.
-		if (!this->d_ptr->pipeDevice->atEnd ()) {
-			
-			// Make sure we only have one connection!
-			connect (this, SIGNAL(bytesWritten(qint64)),
-				 SLOT(deviceReadyRead()), Qt::UniqueConnection);
-			
-			return;
-		}
-		
-	}
-	
-	// When there is nothing more to read from the device, delete this.
-	if (this->d_ptr->pipeDevice->atEnd () || this->d_ptr->pipeMaxlen == 0) {
+	// 
+	if (!sendPipeChunkToClient ()) {
 		
 		// Special case for QProcess: Don't kill the connection while the
 		// process is starting up.
@@ -487,20 +465,13 @@ void Nuria::HttpClient::deviceReadyRead () {
 			return;
 		
 		// Disconnect aboutToClose() as it may lead to infinite recursion
-		disconnect (this->d_ptr->pipeDevice, SIGNAL(aboutToClose()), this, SLOT(deviceReadyRead()));
-		
-		// Also get rid of the bytesWritten() connection
-		disconnect (this, SIGNAL(bytesWritten(qint64)), this, SLOT(deviceReadyRead()));
-		
-		// Close the device
+		disconnect (this->d_ptr->pipeDevice, SIGNAL(aboutToClose()), this, SLOT(pipeToClientReadyRead()));
+		disconnect (this, SIGNAL(bytesWritten(qint64)), this, SLOT(pipeToClientReadyRead()));
 		this->d_ptr->pipeDevice->close ();
 		
 		// Send response header. This is important to do if the user
-		// piped an empty QFile. Else, no response at all will be sent
-		// which wouldn't be good.
+		// piped an empty QFile. Else, no response at all will be sent.
 		sendResponseHeader ();
-		
-		// Close connection
 		close ();
 	}
 	
@@ -599,7 +570,7 @@ bool Nuria::HttpClient::setResponseHeaders (const HeaderMap &headers) {
 	
 }
 
-bool Nuria::HttpClient::pipe (QIODevice *device, qint64 maxlen) {
+bool Nuria::HttpClient::pipeToClient (QIODevice *device, qint64 maxlen) {
 	
 	// Is device readable?
 	if (!device->isReadable ())
@@ -611,45 +582,42 @@ bool Nuria::HttpClient::pipe (QIODevice *device, qint64 maxlen) {
 	this->d_ptr->pipeMaxlen = maxlen;
 	
 	// Connect to readyRead() and aboutToClose() signals
-	connect (device, SIGNAL(readyRead()), SLOT(deviceReadyRead()));
-	connect (device, SIGNAL(aboutToClose()), SLOT(deviceReadyRead()));
+	connect (device, SIGNAL(readyRead()), SLOT(pipeToClientReadyRead()));
+	connect (device, SIGNAL(aboutToClose()), SLOT(pipeToClientReadyRead()));
 	
 	// If it is a QProcess, connect to its finished() signal
 	QProcess *process = qobject_cast< QProcess * > (device);
 	if (process) {
-		connect (process, SIGNAL(finished(int)), SLOT(deviceReadyRead()));
+		connect (process, SIGNAL(finished(int)), SLOT(pipeToClientReadyRead()));
 	}
 	
 	// If it's a QFile, we can send a proper Content-Length header.
-	/// TODO: Same goes for a valid Content-Type header. Qt5 will have something for this iirc.
-	QFile *file = qobject_cast< QFile * > (device);
+	QFileDevice *file = qobject_cast< QFileDevice * > (device);
 	if (file && !this->d_ptr->headerSent &&
 	    !this->d_ptr->responseHeaders.contains (httpHeaderName (HeaderContentLength))) {
-		
 		setContentLength (file->size ());
 		
 	}
 	
 	// Read currently available data
 	if (file || device->bytesAvailable () > 0) {
-		deviceReadyRead ();
+		pipeToClientReadyRead ();
 	}
 	
 	return true;
 }
 
-bool Nuria::HttpClient::pipeBody (QIODevice *device, bool takeOwnership) {
+bool Nuria::HttpClient::pipeFromPostBody (QIODevice *device, bool takeOwnership) {
 	Q_CHECK_PTR(device);
 	
 	// Copy the current buffer into the new one
 	if (this->d_ptr->bufferDevice) {
-		this->d_ptr->bufferDevice->seek (0);
+		this->d_ptr->bufferDevice->reset ();
 		device->write (this->d_ptr->bufferDevice->readAll ());
 		delete this->d_ptr->bufferDevice;
 	}
-		
-	this->d_ptr->bufferDevice = device;
 	
+	this->d_ptr->bufferDevice = device;
 	if (takeOwnership) {
 		device->setParent (this);
 	}
@@ -711,7 +679,7 @@ void Nuria::HttpClient::forceClose () {
 }
 
 bool Nuria::HttpClient::isSequential () const {
-	return true;
+	return !this->d_ptr->bufferDevice->inherits ("TemporaryBufferDevice");
 }
 
 qint64 Nuria::HttpClient::postBodyLength () const {
@@ -845,137 +813,50 @@ void Nuria::HttpClient::setSlotInfo (const SlotInfo &info) {
 }
 
 bool Nuria::HttpClient::sendResponseHeader () {
-	
-	if (!this->d_ptr->headerReady || this->d_ptr->headerSent)
+	if (!this->d_ptr->headerReady || this->d_ptr->headerSent) {
 		return false;
-	
-	// Create headers for range responses.
-	if (this->d_ptr->rangeStart != -1 && this->d_ptr->rangeEnd != -1) {
-		QByteArray range = "bytes " + QByteArray::number (this->d_ptr->rangeStart) +
-				   "-" + QByteArray::number (this->d_ptr->rangeEnd) + 
-				   "/";
-		
-		// Content-Length known?
-		if (this->d_ptr->contentLength > -1) {
-			range.append (QByteArray::number (this->d_ptr->contentLength));
-		} else {
-			range.append ('*');
-		}
-		
-		// Remove old headers
-		this->d_ptr->responseHeaders.remove (httpHeaderName (HeaderContentRange));
-		this->d_ptr->responseHeaders.remove (httpHeaderName (HeaderContentLength));
-		
-		// Store header
-		this->d_ptr->responseHeaders.insert (httpHeaderName (HeaderContentRange), range);
-		
-		// Adjust Content-Length header
-		QByteArray contentLen = QByteArray::number (this->d_ptr->rangeEnd - this->d_ptr->rangeStart);
-		this->d_ptr->responseHeaders.insert (httpHeaderName (HeaderContentLength), contentLen);
-		
-	} else if (this->d_ptr->contentLength != -1) {
-		
-		this->d_ptr->responseHeaders.remove (httpHeaderName (HeaderContentLength));
-		
-		// No range response
-		this->d_ptr->responseHeaders.insert (httpHeaderName (HeaderContentLength),
-						QByteArray::number (this->d_ptr->contentLength));
-		
 	}
 	
-	// Send first line of header (<Http version> <Response code> <Response name>)
-	if (this->d_ptr->requestVersion == Http1_0)
-		this->d_ptr->transport->write ("HTTP/1.0 ");
-	else
-		this->d_ptr->transport->write ("HTTP/1.1 ");
+	// Create headers for range responses and HTTP/1.1 compliance
+	HttpWriter writer;
+	writer.applyRangeHeaders (this->d_ptr->rangeStart, this->d_ptr->rangeEnd,
+				  this->d_ptr->contentLength, this->d_ptr->responseHeaders);
+	writer.addComplianceHeaders (this->d_ptr->requestVersion, this->d_ptr->responseHeaders);
 	
-	this->d_ptr->transport->write (QByteArray::number (this->d_ptr->responseCode));
-	this->d_ptr->transport->putChar (' ');
+	// Construct header data
+	QByteArray firstLine = writer.writeResponseLine (this->d_ptr->requestVersion,
+							 this->d_ptr->responseCode,
+							 this->d_ptr->responseName.toLatin1 ());
+	QByteArray headers = writer.writeHttpHeaders (this->d_ptr->responseHeaders);
+	QByteArray cookies = writer.writeSetCookies (this->d_ptr->responseCookies);
 	
-	// Choose appropriate status code name if nothing was set
-	if (this->d_ptr->responseName.isEmpty ())
-		this->d_ptr->transport->write (httpStatusCodeName (this->d_ptr->responseCode));
-	else
-		this->d_ptr->transport->write (this->d_ptr->responseName.toLatin1 ());
-	
-	// Send headers
-	{
-		
-		QMap< QByteArray, QByteArray >::ConstIterator it = this->d_ptr->responseHeaders.constBegin ();
-		QMap< QByteArray, QByteArray >::ConstIterator end = this->d_ptr->responseHeaders.constEnd ();
-		for (; it != end; ++it) {
-			
-			this->d_ptr->transport->write ("\r\n");
-			this->d_ptr->transport->write (it.key ());
-			this->d_ptr->transport->write (": ");
-			this->d_ptr->transport->write (it.value ());
-			
-		}
-		
-	}
-	
-	// Send cookies
-	{
-		for (const QNetworkCookie &cookie : this->d_ptr->responseCookies) {
-			this->d_ptr->transport->write ("\r\nSet-Cookie: ");
-			this->d_ptr->transport->write (cookie.toRawForm (QNetworkCookie::Full));
-			
-		}
-		
-	}
-	
-	// Send a Date header
-	if (!this->d_ptr->responseHeaders.contains (httpHeaderName (HeaderDate))) {
-		
-		char string[40];
-		tm gmt;
-		time_t timestamp = time (0);
-		gmtime_r (&timestamp, &gmt);
-		
-		// Create a string in the style of "Tue, 15 Nov 1994 08:12:31 GMT"
-		qsnprintf (string, 40, "\r\nDate: %s, %i %s %i %02i:%02i:%02i GMT",
-			   g_days[gmt.tm_wday], gmt.tm_mday, g_months[gmt.tm_mon],
-			   gmt.tm_year + 1900, gmt.tm_hour, gmt.tm_min, gmt.tm_sec);
-		
-		// Send
-		this->d_ptr->transport->write (string);
-		
-	}
-	
-	// Send double new-line to end header and we're done.
-	this->d_ptr->transport->write ("\r\n\r\n");
-//	this->d_ptr->socket->flush ();
+	// Send header
+	this->d_ptr->transport->write (firstLine);
+	this->d_ptr->transport->write (headers);
+	this->d_ptr->transport->write (cookies);
+	this->d_ptr->transport->write ("\r\n");
 	
 	this->d_ptr->headerSent = true;
 	return true;
-	
 }
 
 bool Nuria::HttpClient::killConnection (int error, const QString &cause) {
 	
-	if (!this->d_ptr->transport->isOpen ())
+	if (!this->d_ptr->transport->isOpen ()) {
 		return false;
+	}
 	
 	// Send (really) minimal error response
 	if (!this->d_ptr->headerSent) {
-		QByteArray message = cause.toLatin1 ();
+		this->d_ptr->responseCode = error;
+		this->d_ptr->responseName = cause;
 		
-		// Get status code name if nothing was passed.
-		if (cause.isEmpty ()) {
-			message = httpStatusCodeName (error);
-		}
+		sendResponseHeader ();
 		
-		if (this->d_ptr->requestVersion == Http1_0) {
-			this->d_ptr->transport->write ("HTTP/1.0 ");
-		} else {
-			this->d_ptr->transport->write ("HTTP/1.1 ");
-		}
-		
-		this->d_ptr->transport->write (QByteArray::number (error));
-		this->d_ptr->transport->putChar (' ');
-		this->d_ptr->transport->write (message);
-		this->d_ptr->transport->write ("\r\n\r\n");
-		this->d_ptr->transport->write (message);
+		QByteArray causeData = cause.toLatin1 ();
+		this->d_ptr->transport->write (cause.isEmpty ()
+					       ? httpStatusCodeName (error)
+					       : causeData);
 	}
 	
 	// Close connection

@@ -48,7 +48,6 @@ struct HttpClientPrivate {
 	int responseCode = 200;
 	QString responseName;
 	
-	int bufferMemorySize = (16 * 1024);
 	QIODevice *bufferDevice = nullptr;
 	qint64 postBodyLength = -1;
 	qint64 postBodyTransferred = 0;

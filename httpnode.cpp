@@ -444,7 +444,7 @@ bool Nuria::HttpNode::sendStaticResource (const QStringList &path, int indexInPa
 	
 	// Check if the client used a GET request. If not, respond with a 405.
 	if (client->verb () == HttpClient::GET) {
-		client->pipe (handle, maxLen);
+		client->pipeToClient (handle, maxLen);
 		return true;
 	}
 	

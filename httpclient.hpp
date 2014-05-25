@@ -219,8 +219,8 @@ public:
 	
 	/**
 	 * Returns a value of a header from the request.
-	 * If the client sent multiple values for the header, this method returns
-	 * the last one.
+	 * If the client sent multiple values for the header, this method
+	 * returns the last one.
 	 * Returns an empty QByteArray if there was no header named \a key.
 	 * \sa hasRequestHeader
 	 */
@@ -294,17 +294,17 @@ public:
 	 * to read.
 	 * \note \a device must be readable and open.
 	 */
-	bool pipe (QIODevice *device, qint64 maxlen = -1);
+	bool pipeToClient (QIODevice *device, qint64 maxlen = -1);
 	
 	/**
 	 * Uses \a device from now on as buffer device. You can use this for
 	 * example when you write an application which takes the POST body data,
-	 * processes it somehow and then pipe() the data back.
+	 * processes it somehow and then pipeToClient() the data back.
 	 * The data in the current buffer is written to \a device.
 	 * \note \a device must be open and writable.
 	 * \warning Make sure \a device is not \c 0.
 	 */
-	bool pipeBody (QIODevice *device, bool takeOwnership = false);
+	bool pipeFromPostBody (QIODevice *device, bool takeOwnership = false);
 	
 	/**
 	 * Returns the start position of a 'range' request.
@@ -559,7 +559,7 @@ private slots:
 	void receivedData ();
 	
 	/** The pipe io device has some data for us. */
-	void deviceReadyRead ();
+	void pipeToClientReadyRead ();
 	
 protected:
 	
@@ -572,8 +572,7 @@ protected:
 	/**
 	 * Resolves the URL from the client. That means that the code tries
 	 * to find the associated slot of \a url and calls it if possible.
-	 * Returns \a true on success. If \a false is returned, the connection
-	 * is killed with status code 403 (Forbidden).
+	 * Returns \c true on success.
 	 */
 	bool resolveUrl (const QUrl &url);
 	
@@ -599,11 +598,23 @@ private:
 	 */
 	void readRequestCookies ();
 	
+	qint64 parseIntegerHeaderValue (const QByteArray &value);
+	bool readPostBodyContentLength ();
+	bool send100ContinueIfClientExpectsIt ();
 	bool readAllAvailableHeaderLines ();
 	bool readFirstLine (const QByteArray &line);
 	bool readHeader (const QByteArray &line);
 	bool isReceivedHeaderHttp11Compliant ();
+	bool readAndReactToPostRequest ();
 	bool verifyCompleteHeader ();
+	bool invokeRequestedPath ();
+	bool closeConnectionIfNoLongerNeeded ();
+	
+	/**
+	 * Sends a chunk of the pipeToClient() device to the client.
+	 * Returns \c true if there's more data.
+	 */
+	bool sendPipeChunkToClient ();
 	
 	// 
 	HttpClientPrivate *d_ptr;
