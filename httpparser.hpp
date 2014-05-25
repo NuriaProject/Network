@@ -27,9 +27,6 @@ namespace Nuria {
 
 /**
  * \brief Parser functions for the HyperText Transfer Protocol.
- * 
- * \warning non-const references used to return data from parser methods point
- * to data from the ingoing QByteArray.
  */
 class HttpParser {
 public:

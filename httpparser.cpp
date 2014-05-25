@@ -55,9 +55,9 @@ bool Nuria::HttpParser::parseFirstLine (const QByteArray &data, QByteArray &verb
 	}
 	
 	// Shallow copy fields
-	verb = QByteArray::fromRawData (data.constData (), endOfVerb);
-	path = QByteArray::fromRawData (data.constData () + beginOfPath, pathLength);
-	QByteArray rawVersion = QByteArray::fromRawData (data.constData () + beginOfVersion, versionLength);
+	verb = QByteArray (data.constData (), endOfVerb);
+	path = QByteArray (data.constData () + beginOfPath, pathLength);
+	QByteArray rawVersion = QByteArray (data.constData () + beginOfVersion, versionLength);
 	
 	// Verify fields
 	if (verb.isEmpty () || path.isEmpty () || !rawVersion.startsWith ("HTTP/")) {
@@ -67,7 +67,7 @@ bool Nuria::HttpParser::parseFirstLine (const QByteArray &data, QByteArray &verb
 	// Shallow copy version string
 	beginOfVersion += 5;
 	versionLength -= 5;
-	version = QByteArray::fromRawData (data.constData () + beginOfVersion, versionLength);
+	version = QByteArray (data.constData () + beginOfVersion, versionLength);
 	
 	// Done.
 	return !version.isEmpty ();
@@ -92,8 +92,8 @@ bool Nuria::HttpParser::parseHeaderLine (const QByteArray &data, QByteArray &nam
 	
 	// Shallow copy
 	int valueLength = data.length () - beginOfValue;
-	name = QByteArray::fromRawData (data.constData (), endOfName);
-        value = QByteArray::fromRawData (data.constData () + beginOfValue, valueLength);
+	name = QByteArray (data.constData (), endOfName);
+        value = QByteArray (data.constData () + beginOfValue, valueLength);
 	
 	// Done.
 	return (!name.isEmpty () && !value.isEmpty ());
@@ -156,8 +156,8 @@ bool Nuria::HttpParser::parseRangeHeaderValue (const QByteArray &value, qint64 &
 	}
 	
 	// Read parts
-	QByteArray beginData = QByteArray::fromRawData (value.constData () + beginOfBegin, beginLength);
-	QByteArray endData = QByteArray::fromRawData (value.constData () + beginOfEnd, endLength);
+	QByteArray beginData = QByteArray (value.constData () + beginOfBegin, beginLength);
+	QByteArray endData = QByteArray (value.constData () + beginOfEnd, endLength);
 	
 	// Parse integers
 	bool beginOk = false;
