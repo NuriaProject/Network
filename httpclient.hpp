@@ -609,6 +609,8 @@ private:
 	bool verifyCompleteHeader ();
 	bool invokeRequestedPath ();
 	bool closeConnectionIfNoLongerNeeded ();
+	bool verifyRequestBodyOrClose ();
+	bool verifyRequestContentLength ();
 	
 	/**
 	 * Sends a chunk of the pipeToClient() device to the client.

@@ -180,8 +180,13 @@ bool Nuria::HttpClient::readAllAvailableHeaderLines () {
 			return false;
 			
 		} else if (raw.isEmpty ()) {
+			this->d_ptr->headerReady = true;
+			
 			// If the line is empty, the header is complete.
-			return verifyCompleteHeader () && invokeRequestedPath ();
+			return (verifyRequestBodyOrClose () &&
+				verifyCompleteHeader () &&
+				invokeRequestedPath () &&
+				verifyRequestContentLength ());
 			
 		} else if (this->d_ptr->requestVersion == HttpUnknown) {
 			// This is the first line.
@@ -260,7 +265,6 @@ bool Nuria::HttpClient::readAndReactToPostRequest () {
 }
 
 bool Nuria::HttpClient::verifyCompleteHeader () {
-	this->d_ptr->headerReady = true;
 	
 	// Verify first line
 	if (this->d_ptr->requestVersion == HttpUnknown ||
@@ -294,6 +298,40 @@ bool Nuria::HttpClient::closeConnectionIfNoLongerNeeded () {
 	}
 	
 	return false;
+}
+
+bool Nuria::HttpClient::verifyRequestBodyOrClose () {
+	if (this->d_ptr->requestType != POST &&
+	    this->d_ptr->requestType != PUT &&
+	    this->d_ptr->transport->bytesAvailable () > 0) {
+		killConnection (400);
+		return false;
+	}
+	
+	return true;
+}
+
+bool Nuria::HttpClient::verifyRequestContentLength () {
+	if (this->d_ptr->requestType != POST &&
+	    this->d_ptr->requestType != PUT) {
+		return true;
+	}
+	
+	// 
+	qint64 maxContentLength = 1024 * 1024 * 4;
+	qint64 contentLength = parseIntegerHeaderValue (httpHeaderName (HeaderContentLength));
+	
+	// 
+	if (this->d_ptr->slotInfo.isValid ()) {
+		maxContentLength = this->d_ptr->slotInfo.maxBodyLength ();
+	}
+	
+	if (contentLength == -1 || contentLength > maxContentLength) {
+		killConnection (413);
+		return false;
+	}
+	
+	return true;
 }
 
 bool Nuria::HttpClient::sendPipeChunkToClient () {
