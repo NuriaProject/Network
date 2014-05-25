@@ -540,6 +540,10 @@ public slots:
 	 * \reimp
 	 * \note close() will make sure that all data that is in the write 
 	 * buffer will be sent to the client before the socket is closed.
+	 * 
+	 * If no data has been sent yet, but a request header has been received,
+	 * a appropriate response header will be sent.
+	 * 
 	 * \sa forceClose
 	 */
 	void close () override;

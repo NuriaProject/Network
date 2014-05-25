@@ -48,14 +48,13 @@ Nuria::HttpClient::HttpClient (HttpTransport *transport, HttpServer *server)
 	
 	// Reparent transport
 	this->d_ptr->transport->setParent (this);
-	
-	// 
 	setOpenMode (transport->openMode ());
 	
 	// 
 	connect (transport, SIGNAL(aboutToClose()), SLOT(clientDisconnected()));
 	connect (transport, SIGNAL(readyRead()), SLOT(receivedData()));
 	connect (transport, SIGNAL(bytesWritten(qint64)), SIGNAL(bytesWritten(qint64)));
+	connect (this, SIGNAL(disconnected()), SIGNAL(aboutToClose()));
 	
 	// Insert default response headers
 	this->d_ptr->responseHeaders.insert (httpHeaderName (HeaderConnection), QByteArrayLiteral("Close"));
@@ -433,7 +432,6 @@ void Nuria::HttpClient::clientDisconnected () {
 	
 	// Emit disconnected signal
 	emit aboutToClose ();
-	emit disconnected ();
 	
 	// and delete this later on.
 	deleteLater ();
@@ -469,12 +467,16 @@ void Nuria::HttpClient::receivedData () {
 	    this->d_ptr->postBodyLength == this->d_ptr->postBodyTransferred) {
 		QProcess *process = qobject_cast< QProcess * > (this->d_ptr->bufferDevice);
 		
-		if (!process) {
+		if (!process && this->d_ptr->slotInfo.isValid ()) {
 			this->d_ptr->bufferDevice->reset ();
 		}
 		
-		HttpNode::callSlot (this->d_ptr->slotInfo, this);
-		if (!this->d_ptr->keepConnectionOpen) {
+		if (this->d_ptr->slotInfo.isValid ()) {
+			HttpNode::callSlot (this->d_ptr->slotInfo, this);
+		}
+		
+		if (!this->d_ptr->keepConnectionOpen &&
+		    (!process || process->state () == QProcess::NotRunning)) {
 			close ();
 		}
 		
@@ -609,15 +611,12 @@ bool Nuria::HttpClient::setResponseHeaders (const HeaderMap &headers) {
 }
 
 bool Nuria::HttpClient::pipeToClient (QIODevice *device, qint64 maxlen) {
-	
-	// Is device readable?
 	if (!device->isReadable ())
 		return false;
 	
 	this->d_ptr->pipeDevice = device;
-	device->setParent (this);
-	
 	this->d_ptr->pipeMaxlen = maxlen;
+	device->setParent (this);
 	
 	// Connect to readyRead() and aboutToClose() signals
 	connect (device, SIGNAL(readyRead()), SLOT(pipeToClientReadyRead()));
@@ -706,6 +705,10 @@ void Nuria::HttpClient::close () {
 	// Do nothing if close() has been called already.
 	if (openMode () == QIODevice::NotOpen)
 		return;
+	
+	if (this->d_ptr->headerReady && !this->d_ptr->headerSent) {
+		sendResponseHeader ();
+	}
 	
 	setOpenMode (QIODevice::NotOpen);
 	this->d_ptr->transport->close ();
