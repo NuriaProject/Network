@@ -117,7 +117,10 @@ public:
 		POST = 2, ///< The client issued a POST request
 		HEAD = 4, ///< The client issued a HEAD request
 		PUT = 8, ///< The client issued a PUT request
-		DELETE = 16 ///< The client issued a DELETE request
+		DELETE = 16, ///< The client issued a DELETE request
+		
+		/** OR-combination of all HTTP verbs. */
+		AllVerbs = GET | POST | HEAD | PUT | DELETE
 	};
 	
 	Q_DECLARE_FLAGS(HttpVerbs, HttpVerb)
