@@ -18,11 +18,28 @@
 #ifndef NURIA_RESTFULHTTPNODE_HPP
 #define NURIA_RESTFULHTTPNODE_HPP
 
+#include "httpclient.hpp"
 #include "httpnode.hpp"
+
+/**
+ * Annotation to set the RESTful path pattern of a method.
+ */
+#define NURIA_RESTFUL(Path) NURIA_ANNOTATE(org.nuriaproject.network.restful, Path)
+
+/**
+ * Annotation to only allow certain HttpVerb(s) for the tagged method.
+ * When you want to allow multiple verbs simply OR them together.
+ * Defaults to \c Nuria::HttpClient::AllVerbs.
+ */
+#define NURIA_RESTFUL_VERBS(Verbs) NURIA_ANNOTATE(org.nuriaproject.network.restful.verbs, int(Verbs))
 
 namespace Nuria {
 
+namespace Internal { struct RestfulHttpNodeSlotData; }
+
 class RestfulHttpNodePrivate;
+class MetaMethod;
+class MetaObject;
 
 /**
  * \brief The RestfulHttpNode class makes it easy to write RESTful APIs.
@@ -32,58 +49,60 @@ class RestfulHttpNodePrivate;
  * HttpNode, with the exception that slots are allowed to return something.
  * 
  * \par Usage of this class
- * As already noted you may use the methods known from HttpNode to register
- * slots. This has the advantage of a known flow, but has the big disadvantage
- * that you still need to convert the input arguments, which are in this case
- * expected to be transmitted as GET arguments. To overcome this, you can
- * also sub-class this class. All public slots whose names end in "Action"
- * will be considered to be invokable RESTful methods.
+ * To expose your own service in a RESTful manner, all you need to do is to
+ * sub-class this class and tag it with NURIA_INTROSPECT as usual for Tria
+ * to pick up annotations.
  * 
- * For this to work, the argument names of the slot have to match the GET query
- * names in the request. Additionally, all used types need to be convertable
- * from QString. If not all arguments are specified in the request, the call
- * will fail with a 400 Bad Request reply. The slot may expect a variable of
- * type \a Nuria::HttpClient* as last argument. If this is the case, then the
- * client will be passed to the slot, else there's no way for the slot to know
- * which client called it.
+ * If you don't want to sub-class RestfulHttpNode, you can use the constructor
+ * which takes a object pointer and a MetaObject instance.
  * 
- * \sa Nuria::Variant::registerConversion
+ * Regardless which option you choose, you can then annotate methods you want
+ * to expose using NURIA_RESTFUL() (and optionally with NURIA_RESTFUL_VERBS()).
+ * When using this route all handlers (i.e. NURIA_RESTFUL methods) are
+ * registered automatically when the first invocation on the node happens.
  * 
- * \note When the index of a node is requested a slot called \c indexAction
- * is tried to invoke. If it doesn't exist, the HttpNode mechanism is tried.
+ * \sa setRestfulHandler()
+ * 
+ * \par Request types
+ * By default, a handler is invoked regardless of the HTTP verb used by the
+ * client. You can register multiple methods on the same path while
+ * distinguishing between the different verbs using NURIA_RESTFUL_VERBS().
+ * The same is possible using setRestfulHandler().
+ * 
+ * \par RESTful arguments
+ * The path string may contain names enclosed in curly braces ("{}") to mark
+ * variable parts. These names are expected to directly match those in the
+ * parameter list of the method. The value extracted from the invoked path
+ * must be compatible to the argument type - This means that the value must
+ * be convertible from a QString to the type.
+ * 
+ * If the method has a argument of type 'Nuria::HttpClient*', the HttpClient
+ * behind the request will be passed as value for this parameter.
+ * 
+ * To validate arguments prior calling, use the generic NURIA_REQUIRE()
+ * approach.
+ * 
+ * You can also completely alter this behaviour by reimplementing 
+ * 
+ * \note When using Tria, suitable conversion facilities are already in place
+ * if your type offers conversion methods of some kind.
+ * 
+ * \sa Variant::registerConversion
  * 
  * \par Sending replies to the client
- * You have many options zo send a reply to a client. First, you can send it
- * directly, which is the flow used in HttpNode. This is useful if you're
- * sending e.g. binary data. In this case the slot returns \c void.
+ * To send a response, you can choose to either directly write() something
+ * to the client (See previous paragraph on how to obtain the HttpClient
+ * instance), or your method can return the result. The result type must be
+ * convertible to QByteArray or QString. If a QVariantMap or QVariantList is
+ * returned, then it will be serialized to JSON formatted data and sent as
+ * response.
  * 
- * Second, the slot may return something. This something is then converted
- * to a JSON or XML reply. The following return types are supported out of
- * the box:
+ * It's also possible to return a custom type if Nuria::Serializer is able
+ * to serialize it to a QVariantMap.
  * 
- * - int, bool
- * - QByteArray (No conversion is done!)
- * - QVariantMap and QVariantList
- * 
- * Custom datatypes can be registered too using Nuria::Variant. When a custom
- * type is encountered, the implementation will try to convert it to a JSON or
- * XML reply using the following steps:
- * 
- * 1. Convert it to a QJsonDocument (Only on Qt5) for JSON.
- * 2. Convert it to a QByteArray.
- * 
- * If you don't want to (Or can't) use Nuria::Variant for the conversion, you
- * can also re-implement convertVariantToData, which is called internally, to
- * do the processing.
- * If conversion fails conversionFailure is called which usually replies with
- * a error code of 500.
- * 
- * It's also possible to return a type which is iteratable through
- * Nuria::Variant. In this case convertVariantToData is called for every
- * value in the result set.
- * 
- * \note For this to work you need to register both the type itself \b and the
- * container! See Nuria::Variant::registerIterators
+ * You can change the behaviour of this by reimplementing
+ * convertVariantToData(). If you want to customize the behaviour when
+ * conversion fails, reimplement conversionFailure().
  * 
  * \sa convertVariantToData conversionFailure
  *
@@ -94,28 +113,42 @@ class NURIA_NETWORK_EXPORT RestfulHttpNode : public HttpNode {
 public:
 	
 	/**
-	 * Describes the available reply formats. Defaults to JSON.
+	 * Constructor.
+	 * The node will operate on \a object of type \a metaObject. Ownership
+	 * of \a object is \b not transferred. If you want to do this, you could
+	 * e.g. connect to the destroyed() signal of this instance to
+	 * deleteLater() of \a object, if \a object is a QObject. Another option
+	 * would be connecting a lambda which destroys \a object to destroyed().
 	 */
-	enum ReplyFormat {
-		Custom = 0,
-		JSON,
-//		XML
-	};
+	explicit RestfulHttpNode (void *object, MetaObject *metaObject, const QString &resourceName,
+				  HttpNode *parent = 0);
 	
-	explicit RestfulHttpNode (ReplyFormat format, const QString &resourceName, HttpNode *parent = 0);
-	explicit RestfulHttpNode (const QString &resourceName, HttpNode *parent = 0);
-	explicit RestfulHttpNode (ReplyFormat format = JSON, QObject *parent = 0);
+	/** Constructor. */
+	explicit RestfulHttpNode (const QString &resourceName = QString (), HttpNode *parent = 0);
+	
+	/** Destructor. */
 	~RestfulHttpNode ();
 	
-	/** Returns the reply format. Defaults to ReplyFormat::JSON. */
-	ReplyFormat replyFormat () const;
+	/**
+	 * Manually registers a RESTful handler which will be invoked when
+	 * \a path is requested with a HTTP verb in \a verbs. In this case,
+	 * arguments are read from the requested path as defined in \a path and
+	 * are passed to \a callback in the order defined by \a argumentNames.
+	 * 
+	 * \note When \a callback expects a argument of type
+	 * 'Nuria::HttpClient*', the name of this argument is expected to be
+	 * \b omitted in \a argumentNames!
+	 */
+	void setRestfulHandler (HttpClient::HttpVerbs verbs, const QString &path,
+				const QStringList &argumentNames, const Callback &callback);
 	
-	/** Sets the to-be-used reply format. */
-	void setReplyFormat (ReplyFormat format);
-	
-signals:
-	
-public slots:
+	/**
+	 * \overload
+	 * Does the same as the other setRestfulHandler(), but assumes a value
+	 * of HttpClient::AllVerbs for \a verbs.
+	 */
+	void setRestfulHandler (const QString &path, const QStringList &argumentNames,
+				const Callback &callback);
 	
 protected:
 	
@@ -123,11 +156,18 @@ protected:
 	 * Takes \a variant and tries to convert it to a \c QByteArray.
 	 * When re-implementing this method call the default implementation if
 	 * you don't handle this type:
-	 * \codeline return Nuria::HttpNode::convertVariantToData (variant);
+	 * \codeline return HttpNode::convertVariantToData (variant);
 	 * 
 	 * If a empty QByteArray is returned the conversion has failed.
 	 */
 	virtual QByteArray convertVariantToData (const QVariant &variant);
+	
+	/**
+	 * Takes \a argumentData and returns a QVariant of type \a targetType.
+	 * Returns a invalid QVariant on failure. The behaviour of the default
+	 * implementation is outlined in the class documentation above.
+	 */
+	virtual QVariant convertArgumentToVariant (const QString &argumentData, int targetType);
 	
 	/**
 	 * Called if the conversion for \a variant failed. When this happens
@@ -138,22 +178,29 @@ protected:
 	virtual void conversionFailure (const QVariant &variant, HttpClient *client);
 	
 	/**
-	 * Internal helper method, converts \a result to a QByteArray. Also
-	 * handles the case when \a result is a iteratable type.
+	 * Converts \a result to a QByteArray. A empty QByteArray is treated as
+	 * error.
 	 */
-	QByteArray processResultData (QVariant result, HttpClient *client);
+	QByteArray generateResultData (QVariant result, HttpClient *client);
 	
-	// 
-	bool callSlotByName (const QString &name, HttpClient *client);
+	/** \reimp Does the invocation. */
+	bool invokePath (const QString &path, const QStringList &parts,
+			 int index, HttpClient *client) override;
 	
 private:
 	friend class RestfulHttpNodePrivate;
 	
-	/**
-	 * Registers all slots which are defined in a sub-class. Slots of
-	 * its superclasses are \b not registered.
-	 */
-	void registerActionSlots ();
+	void registerAnnotatedHandlers ();
+	void registerMetaMethod (MetaMethod &method);
+	void registerRestfulHandlerFromMethod (const QString &path, MetaMethod &method);
+	void delayedRegisterMetaObject ();
+	QStringList argumentNamesWithoutClient (MetaMethod &method);
+	QString compilePathRegEx (QString path);
+	bool invokeMatch (Internal::RestfulHttpNodeSlotData &slotData,
+			  QRegularExpressionMatch &match, HttpClient *client);
+	QVariantList argumentValues (const QStringList &names, const QList<int> &types,
+				     QRegularExpressionMatch &match, HttpClient *client);
+	bool writeResponse (const QVariant &response, HttpClient *client);
 	
 	RestfulHttpNodePrivate *d_ptr;
 	

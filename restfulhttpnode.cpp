@@ -17,95 +17,125 @@
 
 #include "restfulhttpnode.hpp"
 
+#include <QRegularExpression>
+#include <serializer.hpp>
 #include <QJsonDocument>
 #include <callback.hpp>
-#include <QMetaObject>
-#include <QMetaMethod>
 #include <debug.hpp>
-#include <QUrlQuery>
 
-struct SlotData {
+enum { NumberOfHandlers = 5 };
+
+struct InvokeInfo {
 	Nuria::Callback callback;
 	QStringList argNames;
-	QByteArray signature;
 };
 
 namespace Nuria {
 
+namespace Internal {
+struct RestfulHttpNodeSlotData {
+	QRegularExpression path;
+	InvokeInfo handlers[NumberOfHandlers];
+};
+}
+
 class RestfulHttpNodePrivate {
 public:
 	
-	RestfulHttpNodePrivate () : loaded (false) {}
+	bool loaded = false;
+	MetaObject *metaObject = nullptr;
+	void *object = nullptr;
 	
-	RestfulHttpNode::ReplyFormat format;
-	QMap< QString, SlotData > methods;
-	bool loaded;
-	
-	void invokeQtSlot (RestfulHttpNode *p, const SlotData &slot, Nuria::HttpClient *client);
+	QMap< QString, Internal::RestfulHttpNodeSlotData > methods;
 	
 };
 
 }
 
-Nuria::RestfulHttpNode::RestfulHttpNode (Nuria::RestfulHttpNode::ReplyFormat format,
-					const QString &resourceName, Nuria::HttpNode *parent)
+Nuria::RestfulHttpNode::RestfulHttpNode (void *object, MetaObject *metaObject, const QString &resourceName,
+					 HttpNode *parent)
 	: Nuria::HttpNode (resourceName, parent), d_ptr (new RestfulHttpNodePrivate)
 {
 	
-	this->d_ptr->format = format;
+	this->d_ptr->loaded = (metaObject != nullptr);
+	this->d_ptr->metaObject = metaObject;
+	this->d_ptr->object = object;
 	
 }
 
 Nuria::RestfulHttpNode::RestfulHttpNode (const QString &resourceName, Nuria::HttpNode *parent)
-	: Nuria::HttpNode (resourceName, parent), d_ptr (new RestfulHttpNodePrivate)
+	: RestfulHttpNode (this, nullptr, resourceName, parent)
 {
 	
-	this->d_ptr->format = JSON;
-}
-
-Nuria::RestfulHttpNode::RestfulHttpNode (Nuria::RestfulHttpNode::ReplyFormat format, QObject *parent)
-	: Nuria::HttpNode (parent), d_ptr (new RestfulHttpNodePrivate)
-{
-	
-	this->d_ptr->format = format;
 }
 
 Nuria::RestfulHttpNode::~RestfulHttpNode () {
 	delete this->d_ptr;
 }
 
-Nuria::RestfulHttpNode::ReplyFormat Nuria::RestfulHttpNode::replyFormat () const {
-	return this->d_ptr->format;
+void Nuria::RestfulHttpNode::setRestfulHandler (Nuria::HttpClient::HttpVerbs verbs, const QString &path,
+						const QStringList &argumentNames,
+						const Nuria::Callback &callback) {
+	QString compiled = compilePathRegEx (path);
+	
+	// Find control structure
+	auto it = this->d_ptr->methods.find (compiled);
+	if (it == this->d_ptr->methods.end ()) {
+		Internal::RestfulHttpNodeSlotData data;
+		data.path.setPattern (compiled);
+		
+		it = this->d_ptr->methods.insert (compiled, data);
+	}
+	
+	// Prepare
+	InvokeInfo info;
+	info.callback = callback;
+	info.argNames = argumentNames;
+	
+	// Store
+	if (verbs & HttpClient::GET) it->handlers[0] = info;
+	if (verbs & HttpClient::POST) it->handlers[1] = info;
+	if (verbs & HttpClient::HEAD) it->handlers[2] = info;
+	if (verbs & HttpClient::PUT) it->handlers[3] = info;
+	if (verbs & HttpClient::DELETE) it->handlers[4] = info;
+	
 }
 
-void Nuria::RestfulHttpNode::setReplyFormat (Nuria::RestfulHttpNode::ReplyFormat format) {
-	this->d_ptr->format = format;
+void Nuria::RestfulHttpNode::setRestfulHandler (const QString &path, const QStringList &argumentNames,
+						const Nuria::Callback &callback) {
+	setRestfulHandler (HttpClient::AllVerbs, path, argumentNames, callback);
 }
 
 QByteArray Nuria::RestfulHttpNode::convertVariantToData (const QVariant &variant) {
-	QVariant r;
 	
 	// Static mappings
 	switch (variant.userType ()) {
+	case QMetaType::QString:
+		return variant.toString ().toUtf8 ();
 	case QMetaType::QByteArray:
 		return variant.toByteArray ();
-	case QMetaType::Int:
-		return QByteArray::number (variant.toInt ());
-	} 
-	
-#ifdef NURIA_USING_QT5
-	// 1. Try to convert variant to a QJsonDocument
-	r = Variant::convert< QJsonDocument > (variant);
-	
-	if (r.isValid ()) {
-		return r.value< QJsonDocument > ().toJson ();
 	}
-#endif
 	
-	// 2. Try to convert variant to a QByteArray
-	r = Variant::convert< QByteArray > (variant);
-	return r.toByteArray ();
+	// 
+	QVariant tryToString = Variant::convert< QString > (variant);
+	if (tryToString.isValid ()) {
+		return tryToString.toString ().toUtf8 ();
+	}
 	
+	// 
+	QVariant tryToByteArray = Variant::convert< QByteArray > (variant);
+	return tryToByteArray.toByteArray ();
+	
+}
+
+QVariant Nuria::RestfulHttpNode::convertArgumentToVariant (const QString &argumentData, int targetType) {
+	if (targetType == QMetaType::QVariant) {
+		return argumentData;
+	}
+	
+	// 
+	QVariant variant = Variant::convert (argumentData, targetType);
+	return variant;
 }
 
 void Nuria::RestfulHttpNode::conversionFailure (const QVariant &variant, Nuria::HttpClient *client) {
@@ -115,230 +145,268 @@ void Nuria::RestfulHttpNode::conversionFailure (const QVariant &variant, Nuria::
 	client->killConnection (500);
 }
 
-QByteArray Nuria::RestfulHttpNode::processResultData (QVariant result, Nuria::HttpClient *client) {
-	static const QByteArray itemSep (",");
-	static const QByteArray listStart ("[");
-	static const QByteArray listEnd ("]");
-	
-	static const QByteArray mapStart ("{");
-	static const QByteArray mapNameLeft ("\"");
-	static const QByteArray mapNameRight ("\":");
-	static const QByteArray mapEnd ("}");
+QByteArray Nuria::RestfulHttpNode::generateResultData (QVariant result, Nuria::HttpClient *client) {
+	Q_UNUSED(client);
 	
 	// 
-	Nuria::Variant::Iterator it = Nuria::Variant::begin (result);
-	Nuria::Variant::Iterator end = Nuria::Variant::end (result);
-	
-	// 
-	bool isList = Nuria::Variant::isList (result);
-	bool isMap = Nuria::Variant::isMap (result);
-	
-	// 
-	QByteArray data;
-	
-	// 
-	if (isList) data.append (listStart);
-	else if (isMap) data.append (mapStart);
-	
-	// 
-	for (; it != end; ++it) {
-		if (isMap) {
-			QString keyName = it.key ().toString ()
-					  .replace (QLatin1Char ('"'), QLatin1String ("\\\""));
-			data.append (mapNameLeft);
-			data.append (keyName);
-			data.append (mapNameRight);
-		}
-		
-		// 
-		QVariant body = it.value ();
-		QByteArray itemData;
-		
-		// Handle QVariantList and QVariantMap
-		if (body.userType () == QMetaType::QVariantList ||
-		    body.userType () == QMetaType::QVariantMap) {
-			itemData = processResultData (body, client);
-		} else {
-			itemData = convertVariantToData (body);
-		}
-		
-		if (itemData.isEmpty ()) {
-			if (!client->responseHeaderSent ()) {
-				conversionFailure (*it, client);
-			}
-			
-			return QByteArray ();
-		}
-		
-		data.append (itemData);
-		data.append (itemSep);
-		
+	switch (result.userType ()) {
+	case QMetaType::QByteArray:
+		return result.toByteArray ();
+	case QMetaType::QString:
+		return result.toString ().toUtf8 ();
+	case QMetaType::QVariantMap:
+	case QMetaType::QVariantList: {
+		return QJsonDocument::fromVariant (result).toJson (QJsonDocument::Compact);
+	} break;
 	}
 	
-	// 
-	data.chop (1);
+	// Try serializing the structure
+	Serializer serializer;
+	void *objectPtr = const_cast< void * > (result.constData ());
+	QVariantMap serialized = serializer.serialize (objectPtr, result.typeName ()); 
 	
 	// 
-	if (isList) data.append (listEnd);
-	else if (isMap) data.append (mapEnd);
+	if (!serializer.failedFields ().isEmpty ()) {
+		return QByteArray ();
+	}
 	
-	// 
-	return data;
+	// Serialize map to JSON.
+	return QJsonDocument::fromVariant (serialized).toJson (QJsonDocument::Compact);
 }
 
-static QVariantList parseClientArguments (const SlotData &data, Nuria::HttpClient *client, bool &error) {
-	QList< int > types = data.callback.argumentTypes ();
-	bool lastIsClient = types.isEmpty ()
-			    ? false
-			    : (types.last () == qMetaTypeId< Nuria::HttpClient * > ());
-	
-	// 
-	QVariantList arguments;
-	
-	QUrlQuery query (client->path ());
-	int len = types.length () - lastIsClient;
-	for (int i = 0; i < len; i++) {
-		int type = types.at (i);
-		const QString &name = data.argNames.at (i);
-		
-		// 
-		if (!query.hasQueryItem (name)) {
-			nError() << "No value for argument" << name
-				 << "in request" << client->path ().toString ();
-			error = true;
-			break;
-		}
-		
-		// 
-		QString rawValue = query.queryItemValue (name);
-		
-		// Convert!
-		QVariant value = Nuria::Variant::convert (rawValue, type);
-		
-		// Sanity check
-		if (!value.isValid ()) {
-			nError() << "bad value" << rawValue << "for argument" << name
-				 << "of type" << QMetaType::typeName (type)
-				 << "in request" << client->path ().toString ();
-			error = true;
-			break;
-		}
-		
-		// Store, next
-		arguments.append (value);
-		
-	}
-	
-	// 
-	if (lastIsClient) {
-		arguments.append (QVariant::fromValue (client));
-	}
-	
-	// 
-	return arguments;
+static InvokeInfo &findInvokeInfo (Nuria::Internal::RestfulHttpNodeSlotData &data, Nuria::HttpClient *client) {
+	int verbIdx = ::ffs (client->verb ()) - 1;
+	return data.handlers[verbIdx % NumberOfHandlers];
 }
 
-static QVariant invokeMetaMethod (const SlotData &data, Nuria::HttpClient *client) {
-	bool error = false;
-        QVariantList arguments = parseClientArguments (data, client, error);
-	nDebug() << "Invoking method" << data.signature << arguments << "fail" << error;
+bool Nuria::RestfulHttpNode::invokePath (const QString &path, const QStringList &parts,
+					 int index, Nuria::HttpClient *client) {
+	delayedRegisterMetaObject ();
 	
-	if (error) {
-		client->killConnection (400);
-		return QVariant ();
+	// 
+	if (!allowAccessToClient (path, parts, index, client)) {
+		return false;
 	}
 	
-	// Invoke!
-	Nuria::Callback cb = data.callback;
-	QVariant result = cb.invoke (arguments);
+	// 
+	QString interestingPart = QStringList (parts.mid (index)).join (QLatin1Char ('/'));
+	
+	// Reverse walk over the QMap, so we first check longer paths.
+	auto it = this->d_ptr->methods.end ();
+	auto end = this->d_ptr->methods.begin ();
+	do {
+		it--;
+		Internal::RestfulHttpNodeSlotData &cur = *it;
+		QRegularExpressionMatch match = cur.path.match (interestingPart);
+		if (match.hasMatch ()) {
+			return invokeMatch (cur, match, client);
+		}
+		
+	} while (it != end);
+	
+	// 
+	return HttpNode::invokePath (path, parts, index, client);
+	
+}
+
+static Nuria::HttpClient::HttpVerbs verbsOfMetaMethod (Nuria::MetaMethod &method) {
+	static const QByteArray annotation = QByteArrayLiteral("org.nuriaproject.network.restful.verbs");
+	
+	int idx = method.annotationLowerBound (annotation);
+	if (idx == -1) {
+		return Nuria::HttpClient::AllVerbs;
+	}
+	
+	// 
+	return Nuria::HttpClient::HttpVerbs (method.annotation (idx).value ().toInt ());
+}
+
+static QString pathOfMetaMethod (Nuria::MetaMethod &method) {
+	static const QByteArray annotation = QByteArrayLiteral("org.nuriaproject.network.restful");
+	
+	int idx = method.annotationLowerBound (annotation);
+	if (idx == -1) {
+		return QString ();
+	}
+	
+	// 
+	return method.annotation (idx).value ().toString ();
+}
+
+void Nuria::RestfulHttpNode::registerAnnotatedHandlers () {
+	this->d_ptr->loaded = true;
+	
+	if (!this->d_ptr->metaObject) {
+		this->d_ptr->metaObject = MetaObject::byName (metaObject ()->className ());
+		if (!this->d_ptr->metaObject) {
+			return;
+		}
+		
+	}
+	
+	// 
+	MetaObject *meta = this->d_ptr->metaObject;
+	for (int i = 0; i < meta->methodCount (); i++) {
+		MetaMethod method = meta->method (i);
+		registerMetaMethod (method);
+	}
+	
+}
+
+void Nuria::RestfulHttpNode::registerRestfulHandlerFromMethod (const QString &path, Nuria::MetaMethod &method) {
+	HttpClient::HttpVerbs verbs = verbsOfMetaMethod (method);
+	
+	QStringList arguments = argumentNamesWithoutClient (method);
+	setRestfulHandler (verbs, path, arguments, method.callback (this->d_ptr->object));
+	
+}
+
+void Nuria::RestfulHttpNode::delayedRegisterMetaObject () {
+	if (!this->d_ptr->loaded) {
+		this->d_ptr->loaded = true;
+		registerAnnotatedHandlers ();
+	}
+	
+}
+
+QStringList Nuria::RestfulHttpNode::argumentNamesWithoutClient (Nuria::MetaMethod &method) {
+	QVector< QByteArray > names = method.argumentNames ();
+	QVector< QByteArray > types = method.argumentTypes ();
+	
+	QStringList list;
+	for (int i = 0; i < names.length (); i++) {
+		if (types.at (i) != "Nuria::HttpClient*") {
+			list.append (QString::fromLatin1 (names.at (i)));
+		}
+		
+	}
+	
+	return list;
+}
+
+template< typename T >
+static QString replaceInString (const QRegularExpression &rx, QString string, T func) {
+	QRegularExpressionMatchIterator it = rx.globalMatch (string);
+	
+	int offset = 0;
+	while (it.hasNext ()) {
+		QRegularExpressionMatch match = it.next ();
+		QString replaceWith = func (match);
+		
+		int length = match.capturedLength ();
+		int begin = match.capturedStart () + offset;
+		string.replace (begin, length, replaceWith);
+		offset += replaceWith.length () - length;
+	}
+	
+	return string;
+}
+
+static QString insertRegularExpression (QRegularExpressionMatch &match) {
+	bool atEnd = match.capturedRef (2).isEmpty ();
+	
+	QString result = QStringLiteral("(?<");
+	result.append (match.capturedRef (1));
+	result.append (QStringLiteral(">"));
+	
+	if (atEnd) {
+		result.append (QStringLiteral(".+)"));
+	} else {
+		result.append (QStringLiteral("[^"));
+		result.append (match.capturedRef (2));
+		result.append (QStringLiteral("]+)"));
+		result.append (match.capturedRef (2));
+	}
 	
 	return result;
 }
 
-void Nuria::RestfulHttpNodePrivate::invokeQtSlot (Nuria::RestfulHttpNode *p,
-						  const SlotData &slot,
-						  HttpClient *client) {
-	QVariant result = invokeMetaMethod (slot, client);
+QString Nuria::RestfulHttpNode::compilePathRegEx (QString path) {
+	static const QRegularExpression rx ("{([^}]+)}(.|$)");
+	path = replaceInString (rx, path, insertRegularExpression);
 	
-	if (!result.isValid ()) {
-		return;
-	}
+	path.prepend ("^");
+	path.append ("$");
 	
-	// 
-	QByteArray reply = p->processResultData (result, client);
-	
-	if (reply.isEmpty ()) {
-		return;
-	}
-	
-	// 
-//	client->setResponseHeader (HttpClient::HeaderContentType
-	client->setContentLength (reply.length ());
-	client->write (reply);
-	
+	return path;
 }
 
-
-bool Nuria::RestfulHttpNode::callSlotByName (const QString &name, Nuria::HttpClient *client) {
+bool Nuria::RestfulHttpNode::invokeMatch (Internal::RestfulHttpNodeSlotData &slotData,
+					  QRegularExpressionMatch &match, HttpClient *client) {
+	InvokeInfo &info = findInvokeInfo (slotData, client);
 	
-	// 
-	if (!this->d_ptr->loaded) {
-		this->d_ptr->loaded = true;
-		registerActionSlots ();
+	// Prepare arguments
+	QList< int > types = info.callback.argumentTypes ();
+	QVariantList arguments = argumentValues (info.argNames, types, match, client);
+	
+	// Sanity check
+	if (types.length () != arguments.length ()) {
+		return false;
 	}
 	
-	// Do we have a Qt slot for this?
-	auto it = this->d_ptr->methods.constFind (name);
-	if (it != this->d_ptr->methods.constEnd ()) {
-		this->d_ptr->invokeQtSlot (this, *it, client);
+	// Invoke
+	int resultType = info.callback.returnType ();
+	QVariant result = info.callback.invoke (arguments);
+	
+	if ((resultType == QMetaType::QVariant && !result.isValid ()) ||
+	    (resultType != QMetaType::Void && resultType != 0 &&
+	     resultType != result.userType ())) {
+		return false;
+	}
+	
+	// Send response
+	return writeResponse (result, client);
+}
+
+QVariantList Nuria::RestfulHttpNode::argumentValues (const QStringList &names, const QList< int > &types,
+						     QRegularExpressionMatch &match, HttpClient *client) {
+	QVariantList list;
+	
+	int i;
+	for (i = 0; i < types.length (); i++) {
+		if (types.at (i) == qMetaTypeId< HttpClient * > ()) {
+			list.append (QVariant::fromValue (client));
+			continue;
+		}
+		
+		// 
+		QString data = match.captured (names.at (i));
+		if (data.isEmpty ()) {
+			return QVariantList ();
+		}
+		
+		QVariant value = convertArgumentToVariant (data, types.at (i));
+		if (!value.isValid ()) {
+			return QVariantList ();
+		}
+		
+		list.append (value);
+	}
+	
+	return list;
+}
+
+bool Nuria::RestfulHttpNode::writeResponse (const QVariant &response, Nuria::HttpClient *client) {
+	if (!response.isValid ()) {
 		return true;
 	}
 	
 	// 
-	return HttpNode::callSlotByName (name, client);
+	QByteArray responseData = generateResultData (response, client);
+	if (responseData.isEmpty ()) {
+		return false;
+	}
+	
+	// 
+	client->write (responseData);
+	return true;
 }
 
-void Nuria::RestfulHttpNode::registerActionSlots () {
+void Nuria::RestfulHttpNode::registerMetaMethod (MetaMethod &method) {
+	QString path = pathOfMetaMethod (method);
 	
-	const QMetaObject *meta = static_cast< QObject * > (this)->metaObject ();
-	
-	int i = RestfulHttpNode::staticMetaObject.methodCount ();
-	
-	for (; i < meta->methodCount (); i++) {
-		QMetaMethod m = meta->method (i);
-		
-		// We only want public slots.
-		if (m.access () != QMetaMethod::Public ||
-		    m.methodType () != QMetaMethod::Slot) {
-			continue;
-		}
-		
-		// 
-		QByteArray signature ("1");
-		
-		signature.append (m.methodSignature ());
-		QByteArray methodName = m.name ();
-		
-		// Skip all which don't end in "Action".
-		if (!methodName.endsWith ("Action")) {
-			continue;
-		}
-		
-		// 
-		SlotData data;
-		data.signature = signature;
-		
-		foreach (const QByteArray &name, m.parameterNames ()) {
-			data.argNames.append (name);
-		}
-		
-		data.callback.setCallback (this, data.signature.constData ());
-		
-		// Store
-		methodName.chop (6); // Remove trailing "Action"
-		
-		this->d_ptr->methods.insert (QString::fromLatin1 (methodName), data);
-		
+	if (!path.isEmpty ()) {
+		registerRestfulHandlerFromMethod (path, method);
 	}
 	
 }
