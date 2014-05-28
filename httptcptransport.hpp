@@ -29,7 +29,7 @@ class HttpTcpTransportPrivate;
 /**
  * \brief HttpClient transport for TCP with or without SSL connections.
  */
-class HttpTcpTransport : public HttpTransport {
+class NURIA_NETWORK_EXPORT HttpTcpTransport : public HttpTransport {
 	Q_OBJECT
 public:
 	

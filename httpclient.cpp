@@ -68,7 +68,6 @@ Nuria::HttpClient::HttpClient (HttpTransport *transport, HttpServer *server)
 
 Nuria::HttpClient::~HttpClient () {
 	delete this->d_ptr;
-	
 }
 
 Nuria::HttpTransport *Nuria::HttpClient::transport () const {

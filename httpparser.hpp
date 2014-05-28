@@ -28,7 +28,7 @@ namespace Nuria {
 /**
  * \brief Parser functions for the HyperText Transfer Protocol.
  */
-class HttpParser {
+class NURIA_NETWORK_EXPORT HttpParser {
 public:
 	/** Constructor. */
 	HttpParser ();

@@ -26,7 +26,7 @@ namespace Nuria {
 /**
  * \brief Writer for HTTP data.
  */
-class HttpWriter {
+class NURIA_NETWORK_EXPORT HttpWriter {
 public:
 	
 	/** Constructor. */

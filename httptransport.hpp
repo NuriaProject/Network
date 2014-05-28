@@ -18,6 +18,7 @@
 #ifndef NURIA_HTTPTRANSPORT_HPP
 #define NURIA_HTTPTRANSPORT_HPP
 
+#include "network_global.hpp"
 #include <QHostAddress>
 #include <QIODevice>
 
@@ -30,7 +31,7 @@ namespace Nuria {
  * through a specific connection. The connection can be anything which can
  * be represented as HttpTransport, e.g. TCP, SSL or a QBuffer (memory buffer).
  */
-class HttpTransport : public QIODevice {
+class NURIA_NETWORK_EXPORT HttpTransport : public QIODevice {
 	Q_OBJECT
 	Q_ENUMS(Type)
 public:
