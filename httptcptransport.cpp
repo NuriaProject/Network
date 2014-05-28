@@ -36,6 +36,7 @@ Nuria::HttpTcpTransport::HttpTcpTransport (QTcpSocket *socket, QObject *parent)
 	
 	this->d_ptr->socket = socket;
 	this->d_ptr->sslSocket = qobject_cast< QSslSocket * > (socket);
+	setOpenMode (ReadWrite);
 	
 	// Forward signals
 	connect (this->d_ptr->socket, SIGNAL(disconnected()), SIGNAL(aboutToClose()));
@@ -64,6 +65,7 @@ qint64 Nuria::HttpTcpTransport::readLineData (char *data, qint64 maxlen) {
 }
 
 qint64 Nuria::HttpTcpTransport::writeData (const char *data, qint64 len) {
+	QIODevice::seek (0);
 	return this->d_ptr->socket->write (data, len);
 }
 
@@ -104,6 +106,8 @@ bool Nuria::HttpTcpTransport::open (QIODevice::OpenMode mode) {
 }
 
 void Nuria::HttpTcpTransport::close () {
+	setOpenMode (NotOpen);
+	
 	if (closeSocketWhenBytesWereWritten ()) {
 		return;
 	}
@@ -128,7 +132,7 @@ qint64 Nuria::HttpTcpTransport::size () const {
 }
 
 bool Nuria::HttpTcpTransport::seek (qint64 pos) {
-	return this->d_ptr->socket->seek (pos);
+	return false;
 }
 
 bool Nuria::HttpTcpTransport::atEnd () const {
