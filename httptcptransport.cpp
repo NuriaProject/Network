@@ -151,7 +151,7 @@ qint64 Nuria::HttpTcpTransport::bytesToWrite () const {
 }
 
 bool Nuria::HttpTcpTransport::canReadLine () const {
-	return this->d_ptr->socket->canReadLine ();
+	return this->d_ptr->socket->canReadLine () || QIODevice::canReadLine ();
 }
 
 bool Nuria::HttpTcpTransport::waitForReadyRead (int msecs) {
