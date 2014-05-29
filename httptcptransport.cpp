@@ -65,7 +65,6 @@ qint64 Nuria::HttpTcpTransport::readLineData (char *data, qint64 maxlen) {
 }
 
 qint64 Nuria::HttpTcpTransport::writeData (const char *data, qint64 len) {
-	QIODevice::seek (0);
 	return this->d_ptr->socket->write (data, len);
 }
 
