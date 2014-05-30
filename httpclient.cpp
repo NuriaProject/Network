@@ -981,7 +981,7 @@ QByteArray Nuria::HttpClient::httpHeaderName (HttpClient::HttpHeader header) {
 	case HeaderExpect: return QByteArrayLiteral("Expect");
 	case HeaderContentEncoding: return QByteArrayLiteral("Content-Encoding");
 	case HeaderContentLanguage: return QByteArrayLiteral("Content-Language");
-	case HeaderContentDisposition: return QByteArrayLiteral("Disposition");
+	case HeaderContentDisposition: return QByteArrayLiteral("Content-Disposition");
 	case HeaderContentRange: return QByteArrayLiteral("Content-Range");
 	case HeaderLastModified: return QByteArrayLiteral("Last-Modified");
 	case HeaderRefresh: return QByteArrayLiteral("Refresh");
