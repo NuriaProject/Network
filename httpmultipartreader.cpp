@@ -278,6 +278,11 @@ bool Nuria::HttpMultiPartReader::parseHeaders () {
 	info.mimeType = QString::fromLatin1 (type);
 	info.buffer = new TemporaryBufferDevice (this);
 	
+	// RFC2388 Section 3
+	if (info.mimeType.isEmpty ()) {
+		info.mimeType = QStringLiteral("text/plain");
+	}
+	
 	// 
 	this->d_ptr->fields.insert (name, info);
 	initCurrentBuffer (name, info.buffer);
