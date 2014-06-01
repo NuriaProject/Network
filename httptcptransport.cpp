@@ -131,6 +131,7 @@ qint64 Nuria::HttpTcpTransport::size () const {
 }
 
 bool Nuria::HttpTcpTransport::seek (qint64 pos) {
+	Q_UNUSED(pos);
 	return false;
 }
 
