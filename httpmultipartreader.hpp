@@ -41,7 +41,7 @@ class TemporaryBufferDevice;
  * - fieldLength() will return \c -1 as long the transfer is in process.
  * - fieldMimeType() may or may not return something useful.
  */
-class HttpMultiPartReader : public HttpPostBodyReader {
+class NURIA_NETWORK_EXPORT HttpMultiPartReader : public HttpPostBodyReader {
 	Q_OBJECT
 public:
 	

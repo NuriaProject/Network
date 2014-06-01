@@ -18,6 +18,7 @@
 #ifndef NURIA_HTTPPOSTBODYREADER_HPP
 #define NURIA_HTTPPOSTBODYREADER_HPP
 
+#include "network_global.hpp"
 #include <QStringList>
 #include <QObject>
 
@@ -37,7 +38,7 @@ namespace Nuria {
  * thus large amounts of data may be copied.
  * 
  */
-class HttpPostBodyReader : public QObject {
+class NURIA_NETWORK_EXPORT HttpPostBodyReader : public QObject {
 	Q_OBJECT
 public:
 	
