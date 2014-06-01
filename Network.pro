@@ -22,7 +22,9 @@ SOURCES += httpclient.cpp \
     httpparser.cpp \
     httptransport.cpp \
     httptcptransport.cpp \
-    httpwriter.cpp
+    httpwriter.cpp \
+    httppostbodyreader.cpp \
+    httpmultipartreader.cpp
 
 GLOBAL_HEADERS = network_global.hpp \
     httpclient.hpp \
@@ -33,7 +35,9 @@ GLOBAL_HEADERS = network_global.hpp \
     httpparser.hpp \
     httptransport.hpp \
     httptcptransport.hpp \
-    httpwriter.hpp
+    httpwriter.hpp \
+    httppostbodyreader.hpp \
+    httpmultipartreader.hpp
     
 PRIVATE_HEADERS = \
     private/httpprivate.hpp
