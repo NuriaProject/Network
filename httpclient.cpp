@@ -28,6 +28,7 @@
 #include <ctime>
 
 #include <temporarybufferdevice.hpp>
+#include "httpmultipartreader.hpp"
 #include "httptransport.hpp"
 #include "httpparser.hpp"
 #include "httpserver.hpp"
@@ -305,7 +306,7 @@ bool Nuria::HttpClient::verifyRequestBodyOrClose () {
 	return true;
 }
 
-bool Nuria::HttpClient::requestHasPostBody () {
+bool Nuria::HttpClient::requestHasPostBody () const {
 	return (this->d_ptr->requestType == POST || this->d_ptr->requestType == PUT);
 }
 
@@ -321,6 +322,28 @@ bool Nuria::HttpClient::postProcessRequestHeader () {
 	// Failed.
 	killConnection (400);
 	return false;
+}
+
+bool Nuria::HttpClient::contentTypeIsMultipart (const QByteArray &value) const {
+	return value.startsWith ("multipart/form-data;");
+}
+
+Nuria::HttpPostBodyReader *Nuria::HttpClient::createHttpMultiPartReader (const QByteArray &header) {
+	static const QByteArray boundaryStr = QByteArrayLiteral("boundary=");
+	int idx = header.indexOf (boundaryStr);
+	
+	if (idx == -1) {
+		return nullptr;
+	}
+	
+	// 
+	QByteArray boundary = header.mid (idx + boundaryStr.length ());
+	if (boundary.isEmpty ()) {
+		return nullptr;
+	}
+	
+	// 
+	return new HttpMultiPartReader (this, boundary, this);
 }
 
 bool Nuria::HttpClient::sendPipeChunkToClient () {
@@ -657,6 +680,7 @@ bool Nuria::HttpClient::pipeFromPostBody (QIODevice *device, bool takeOwnership)
 		device->setParent (this);
 	}
 	
+	setOpenMode (WriteOnly);
 	return true;
 }
 
@@ -849,6 +873,71 @@ Nuria::SlotInfo Nuria::HttpClient::slotInfo () const {
 
 void Nuria::HttpClient::setSlotInfo (const SlotInfo &info) {
 	this->d_ptr->slotInfo = info;
+}
+
+bool Nuria::HttpClient::hasReadablePostBody () const {
+	if (!requestHasPostBody ()) {
+		return false;
+	}
+	
+	// 
+	QByteArray contentType = this->d_ptr->requestHeaders.value (httpHeaderName (HeaderContentType));
+	if (contentTypeIsMultipart (contentType)) {
+		return true;
+	}
+	
+	// 
+	return false;
+}
+
+Nuria::HttpPostBodyReader *Nuria::HttpClient::postBodyReader () {
+	if (!requestHasPostBody () || this->d_ptr->bodyReader) {
+		return this->d_ptr->bodyReader;
+	}
+	
+	// Create new reader
+	QByteArray contentType = this->d_ptr->requestHeaders.value (httpHeaderName (HeaderContentType));
+	HttpPostBodyReader *reader = nullptr;
+	
+	// HTTP multi-part ?
+	if (contentTypeIsMultipart (contentType)) {
+		reader = createHttpMultiPartReader (contentType);
+	}
+	
+	// Done.
+	this->d_ptr->bodyReader = reader;
+	return reader;
+}
+
+bool Nuria::HttpClient::atEnd () const {
+	if (!requestHasPostBody ()) {
+		return true;
+	}
+	
+	// 
+	return this->d_ptr->bufferDevice->atEnd ();
+}
+
+qint64 Nuria::HttpClient::pos () const {
+	return this->d_ptr->bufferDevice->pos ();
+}
+
+qint64 Nuria::HttpClient::size () const {
+	return this->d_ptr->bufferDevice->size ();
+}
+
+bool Nuria::HttpClient::seek (qint64 pos) {
+	if (pos > this->d_ptr->bufferDevice->size ()) {
+		return false;
+	}
+	
+	QIODevice::seek (pos);
+	return this->d_ptr->bufferDevice->seek (pos);
+}
+
+bool Nuria::HttpClient::reset () {
+	QIODevice::reset ();
+	return this->d_ptr->bufferDevice->reset ();
 }
 
 bool Nuria::HttpClient::sendResponseHeader () {

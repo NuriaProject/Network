@@ -18,6 +18,7 @@
 #ifndef NURIA_HTTPCLIENT_HPP
 #define NURIA_HTTPCLIENT_HPP
 
+#include "httppostbodyreader.hpp"
 #include "network_global.hpp"
 #include <QNetworkCookie>
 #include <QHostAddress>
@@ -51,8 +52,9 @@ class SlotInfo;
  * There is really not much to say about this - You can do anything with it
  * that you can do with any QIODevice subclass.
  * 
- * \note HttpClient is a sequential device for obvious reasons. This basically
- * means you can't use seek() and similar methods.
+ * \note HttpClient is a random-access device. Methods such as read(), pos() and
+ * seek() always refer to the POST body. Writing always refers to sending data
+ * back to the client.
  * 
  * \par Piping
  * Additionally to the generic read and write methods, you can also pipe other
@@ -304,8 +306,12 @@ public:
 	 * example when you write an application which takes the POST body data,
 	 * processes it somehow and then pipeToClient() the data back.
 	 * The data in the current buffer is written to \a device.
+	 * 
+	 * Upon calling, the openMode of the HttpClient will be changed to
+	 * QIODevice::WriteOnly.
+	 * 
 	 * \note \a device must be open and writable.
-	 * \warning Make sure \a device is not \c 0.
+	 * \warning Make sure \a device is not \c nullptr.
 	 */
 	bool pipeFromPostBody (QIODevice *device, bool takeOwnership = false);
 	
@@ -350,7 +356,11 @@ public:
 	 */
 	bool setContentLength (qint64 length);
 	
-	/** \reimp */
+	/**
+	 * Returns \c false, meaning this is a random-access device.
+	 * \warning If you've set a buffer device through pipeFromPostBody(),
+	 * then \c true is returned.
+	 */
 	virtual bool isSequential () const;
 	
 	/**
@@ -507,6 +517,37 @@ public:
 	 */
 	void setSlotInfo (const SlotInfo &info);
 	
+	/**
+	 * Returns \c true only if this request has a POST body and it's
+	 * readable by one of the readers known to HttpClient, e.g. for
+	 * HTTP multi-part.
+	 * 
+	 * \sa read()
+	 */
+	bool hasReadablePostBody () const;
+	
+	/**
+	 * If hasReadablePostBody() returns \c true, returns a suitable
+	 * POST body reader instance. Else returns \c nullptr. The reader
+	 * instance is owned by the HttpClient. Consecutive calls of this
+	 * method will always return the same result. The first call will
+	 * create the reader.
+	 */
+	HttpPostBodyReader *postBodyReader ();
+	
+	/**
+	 * Returns \c true if the POST body has been completely read by the
+	 * user. Also returns \c true if the request has no POST body at all.
+	 * Returns \c false otherwise.
+	 */
+	bool atEnd () const override;
+	
+	// 
+	qint64 pos () const override;
+	qint64 size () const override;
+	bool seek (qint64 pos) override;
+	bool reset () override;
+	
 signals:
 	
 	/** Gets emitted when the user just closed the connection. */
@@ -617,8 +658,10 @@ private:
 	bool invokeRequestedPath ();
 	bool closeConnectionIfNoLongerNeeded ();
 	bool verifyRequestBodyOrClose ();
-	bool requestHasPostBody ();
+	bool requestHasPostBody () const;
 	bool postProcessRequestHeader ();
+	bool contentTypeIsMultipart (const QByteArray &value) const;
+	HttpPostBodyReader *createHttpMultiPartReader (const QByteArray &header);
 	
 	/**
 	 * Sends a chunk of the pipeToClient() device to the client.

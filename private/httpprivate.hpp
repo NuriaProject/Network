@@ -49,6 +49,7 @@ struct HttpClientPrivate {
 	QString responseName;
 	
 	QIODevice *bufferDevice = nullptr;
+	HttpPostBodyReader *bodyReader = nullptr;
 	qint64 postBodyLength = -1;
 	qint64 postBodyTransferred = 0;
 	bool chunkedBodyTransfer = false; // For 100-continue stuff
