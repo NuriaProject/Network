@@ -174,6 +174,17 @@ QByteArray Nuria::RestfulHttpNode::generateResultData (QVariant result, Nuria::H
 	return QJsonDocument::fromVariant (serialized).toJson (QJsonDocument::Compact);
 }
 
+
+#ifndef Q_OS_UNIX
+#if defined(Q_CC_MINGW) || defined (Q_CC_GNU)
+static inline int ffs (int i) { return __builtin_ffs (i); }
+#elif defined(Q_CC_MSVC)
+static inline int ffs (int i) { return _BitScanForward (i); }
+#else
+#error "Please provide a ffs (Find First Set Bit) function for your platform/compiler"
+#endif
+#endif
+
 static InvokeInfo &findInvokeInfo (Nuria::Internal::RestfulHttpNodeSlotData &data, Nuria::HttpClient *client) {
 	int verbIdx = ::ffs (client->verb ()) - 1;
 	return data.handlers[verbIdx % NumberOfHandlers];
