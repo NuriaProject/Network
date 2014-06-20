@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['fastcgihttpserver',['FastCgiHttpServer',['../class_nuria_1_1_fast_cgi_http_server.html',1,'Nuria']]]
+  ['restfulhttpnode',['RestfulHttpNode',['../class_nuria_1_1_restful_http_node.html',1,'Nuria']]]
 ];

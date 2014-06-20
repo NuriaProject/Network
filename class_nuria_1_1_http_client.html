@@ -301,6 +301,24 @@ Public Member Functions</h2></td></tr>
 <tr class="separator:a5728d9b38e3217dbb67119c474634fb3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7da568503f70bf8cc13b2bde38862129"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_nuria_1_1_http_client.html#a7da568503f70bf8cc13b2bde38862129">setSlotInfo</a> (const <a class="el" href="class_nuria_1_1_slot_info.html">SlotInfo</a> &amp;info)</td></tr>
 <tr class="separator:a7da568503f70bf8cc13b2bde38862129"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a73f9848d5e1c6a393e97a5160774e312"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_nuria_1_1_http_client.html#a73f9848d5e1c6a393e97a5160774e312">hasReadablePostBody</a> () const </td></tr>
+<tr class="separator:a73f9848d5e1c6a393e97a5160774e312"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae87f7ee41e8e45f3740dacb71bf76ac9"><td class="memItemLeft" align="right" valign="top"><a class="el" href="class_nuria_1_1_http_post_body_reader.html">HttpPostBodyReader</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_nuria_1_1_http_client.html#ae87f7ee41e8e45f3740dacb71bf76ac9">postBodyReader</a> ()</td></tr>
+<tr class="separator:ae87f7ee41e8e45f3740dacb71bf76ac9"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0dfdae3faf92b0ea34cbfbaa5070fe7e"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="class_nuria_1_1_http_client.html#a0dfdae3faf92b0ea34cbfbaa5070fe7e">atEnd</a> () const override</td></tr>
+<tr class="separator:a0dfdae3faf92b0ea34cbfbaa5070fe7e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a03b0cb04f61fb592ccdd0d8fbd7f5868"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a03b0cb04f61fb592ccdd0d8fbd7f5868"></a>
+qint64&#160;</td><td class="memItemRight" valign="bottom"><b>pos</b> () const override</td></tr>
+<tr class="separator:a03b0cb04f61fb592ccdd0d8fbd7f5868"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:abfc94dcef4633950aa744e1607d18bf4"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="abfc94dcef4633950aa744e1607d18bf4"></a>
+qint64&#160;</td><td class="memItemRight" valign="bottom"><b>size</b> () const override</td></tr>
+<tr class="separator:abfc94dcef4633950aa744e1607d18bf4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a93710408e54bb6b7e177983c1b11e8a2"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a93710408e54bb6b7e177983c1b11e8a2"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>seek</b> (qint64 pos) override</td></tr>
+<tr class="separator:a93710408e54bb6b7e177983c1b11e8a2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a90249cb73ca75255d09898fab7bec89c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a90249cb73ca75255d09898fab7bec89c"></a>
+bool&#160;</td><td class="memItemRight" valign="bottom"><b>reset</b> () override</td></tr>
+<tr class="separator:a90249cb73ca75255d09898fab7bec89c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-static-methods"></a>
 Static Public Member Functions</h2></td></tr>
@@ -334,7 +352,7 @@ class&#160;</td><td class="memItemRight" valign="bottom"><b>HttpNode</b></td></t
 <p>This class is used whenever interaction with the HTTP client is necessary. It provides a simple way to transfer data from and to the client.</p>
 <dl class="section note"><dt>Note</dt><dd>As of now, <a class="el" href="class_nuria_1_1_http_client.html" title="The HttpClient class represents a connection to a client. ">HttpClient</a> doesn't support <code>Connection: keep-alive</code>. This means that a client has to open a connection for each request. This problem will be addressed in the future.</dd></dl>
 <dl class="section user"><dt>Sending and receiving data</dt><dd><a class="el" href="class_nuria_1_1_http_client.html" title="The HttpClient class represents a connection to a client. ">HttpClient</a> is a subclass of QIODevice. Slots that expect a POST body can read it by using readAll or similar QIODevice methods. To send data to the client simply use write or similar. There is really not much to say about this - You can do anything with it that you can do with any QIODevice subclass.</dd></dl>
-<dl class="section note"><dt>Note</dt><dd><a class="el" href="class_nuria_1_1_http_client.html" title="The HttpClient class represents a connection to a client. ">HttpClient</a> is a sequential device for obvious reasons. This basically means you can't use seek() and similar methods.</dd></dl>
+<dl class="section note"><dt>Note</dt><dd><a class="el" href="class_nuria_1_1_http_client.html" title="The HttpClient class represents a connection to a client. ">HttpClient</a> is a random-access device. Methods such as read(), pos() and seek() always refer to the POST body. Writing always refers to sending data back to the client.</dd></dl>
 <dl class="section user"><dt>Piping</dt><dd>Additionally to the generic read and write methods, you can also pipe other QIODevice*'s to the client. This means that the implementation will take care of data transfer and will close the connection automatically on completion. This is useful when you want to send a large chunk of data. Another use-case is to combine this with QProcess when you want or need to interact with other applications.</dd></dl>
 <p>This is possible for both directions: You can either pipe a buffer to the client, or pipe the clients post body into a QIODevice.</p>
 <p>An example would be to use this to process a file while the user is still uploading it.</p>
@@ -510,6 +528,30 @@ class&#160;</td><td class="memItemRight" valign="bottom"><b>HttpNode</b></td></t
 </div>
 </div>
 <h2 class="groupheader">Member Function Documentation</h2>
+<a class="anchor" id="a0dfdae3faf92b0ea34cbfbaa5070fe7e"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool Nuria::HttpClient::atEnd </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">override</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<p>Returns <code>true</code> if the POST body has been completely read by the user. Also returns <code>true</code> if the request has no POST body at all. Returns <code>false</code> otherwise. </p>
+
+</div>
+</div>
 <a class="anchor" id="a54881b3ffaaa2bf89204b19214c6887e"></a>
 <div class="memitem">
 <div class="memproto">
@@ -674,6 +716,23 @@ class&#160;</td><td class="memItemRight" valign="bottom"><b>HttpNode</b></td></t
 </div><div class="memdoc">
 <p>Returns if there is a cookie <em>name</em>. </p><dl class="section note"><dt>Note</dt><dd>This method refers to cookies received from the client. </dd></dl>
 <dl class="section see"><dt>See also</dt><dd><a class="el" href="class_nuria_1_1_http_client.html#a1350c9e8c863b1eee4cd237f87ce9c64">cookies</a> <a class="el" href="class_nuria_1_1_http_client.html#a2675731e7c9b7ffc3ff6ff7d110b6408">cookie</a> </dd></dl>
+
+</div>
+</div>
+<a class="anchor" id="a73f9848d5e1c6a393e97a5160774e312"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool Nuria::HttpClient::hasReadablePostBody </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Returns <code>true</code> only if this request has a POST body and it's readable by one of the readers known to <a class="el" href="class_nuria_1_1_http_client.html" title="The HttpClient class represents a connection to a client. ">HttpClient</a>, e.g. for HTTP multi-part.</p>
+<dl class="section see"><dt>See also</dt><dd>read() </dd></dl>
 
 </div>
 </div>
@@ -887,6 +946,7 @@ class&#160;</td><td class="memItemRight" valign="bottom"><b>HttpNode</b></td></t
   </tr>
 </table>
 </div><div class="memdoc">
+<p>Returns <code>false</code>, meaning this is a random-access device. </p><dl class="section warning"><dt>Warning</dt><dd>If you've set a buffer device through <a class="el" href="class_nuria_1_1_http_client.html#a4c916dbd1c9d684240c7519734500308">pipeFromPostBody()</a>, then <code>true</code> is returned. </dd></dl>
 
 </div>
 </div>
@@ -1045,8 +1105,10 @@ class&#160;</td><td class="memItemRight" valign="bottom"><b>HttpNode</b></td></t
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Uses <em>device</em> from now on as buffer device. You can use this for example when you write an application which takes the POST body data, processes it somehow and then <a class="el" href="class_nuria_1_1_http_client.html#a6baf918508447630a43fa6b4fb8a7841">pipeToClient()</a> the data back. The data in the current buffer is written to <em>device</em>. </p><dl class="section note"><dt>Note</dt><dd><em>device</em> must be open and writable. </dd></dl>
-<dl class="section warning"><dt>Warning</dt><dd>Make sure <em>device</em> is not <code>0</code>. </dd></dl>
+<p>Uses <em>device</em> from now on as buffer device. You can use this for example when you write an application which takes the POST body data, processes it somehow and then <a class="el" href="class_nuria_1_1_http_client.html#a6baf918508447630a43fa6b4fb8a7841">pipeToClient()</a> the data back. The data in the current buffer is written to <em>device</em>.</p>
+<p>Upon calling, the openMode of the <a class="el" href="class_nuria_1_1_http_client.html" title="The HttpClient class represents a connection to a client. ">HttpClient</a> will be changed to QIODevice::WriteOnly.</p>
+<dl class="section note"><dt>Note</dt><dd><em>device</em> must be open and writable. </dd></dl>
+<dl class="section warning"><dt>Warning</dt><dd>Make sure <em>device</em> is not <code>nullptr</code>. </dd></dl>
 
 </div>
 </div>
@@ -1114,6 +1176,22 @@ class&#160;</td><td class="memItemRight" valign="bottom"><b>HttpNode</b></td></t
       </table>
 </div><div class="memdoc">
 <p>Convenience function, returns the length of the POST body using the Content-Length header. </p>
+
+</div>
+</div>
+<a class="anchor" id="ae87f7ee41e8e45f3740dacb71bf76ac9"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="class_nuria_1_1_http_post_body_reader.html">HttpPostBodyReader</a>* Nuria::HttpClient::postBodyReader </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>If <a class="el" href="class_nuria_1_1_http_client.html#a73f9848d5e1c6a393e97a5160774e312">hasReadablePostBody()</a> returns <code>true</code>, returns a suitable POST body reader instance. Else returns <code>nullptr</code>. The reader instance is owned by the <a class="el" href="class_nuria_1_1_http_client.html" title="The HttpClient class represents a connection to a client. ">HttpClient</a>. Consecutive calls of this method will always return the same result. The first call will create the reader. </p>
 
 </div>
 </div>
@@ -1810,7 +1888,7 @@ Do not combine this with pipe(). </dd></dl>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Thu May 29 2014 14:30:56 for Nuria Framework - Network by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Fri Jun 20 2014 19:36:08 for Nuria Framework - Network by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.7
 </small></address>

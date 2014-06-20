@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['parentnode',['parentNode',['../class_nuria_1_1_abstract_http_node.html#af3f65128dec796f8328a98f659b927ce',1,'Nuria::AbstractHttpNode::parentNode()'],['../class_nuria_1_1_http_node.html#abeca65a51d23602b533e19d4a6251148',1,'Nuria::HttpNode::parentNode()']]],
+  ['parentnode',['parentNode',['../class_nuria_1_1_http_node.html#abeca65a51d23602b533e19d4a6251148',1,'Nuria::HttpNode']]],
   ['parsecookies',['parseCookies',['../class_nuria_1_1_http_parser.html#adc780529bbf8884ec7eed9b3a02050c1',1,'Nuria::HttpParser']]],
   ['parsefirstline',['parseFirstLine',['../class_nuria_1_1_http_parser.html#af34178c1a07e110a07412f71c3e14d1d',1,'Nuria::HttpParser']]],
   ['parsefirstlinefull',['parseFirstLineFull',['../class_nuria_1_1_http_parser.html#ac5ad2dd1757833f0d158e1c3bb2273ba',1,'Nuria::HttpParser']]],
@@ -17,6 +17,7 @@ var searchData=
   ['post',['POST',['../class_nuria_1_1_http_client.html#a47878d81d933a0f4b50c97a11c343456acfc90853aa6bd03ae0186fea4bfad71c',1,'Nuria::HttpClient']]],
   ['postbodycomplete',['postBodyComplete',['../class_nuria_1_1_http_client.html#a2b29644200468143f00ed0a8f4b098f7',1,'Nuria::HttpClient']]],
   ['postbodylength',['postBodyLength',['../class_nuria_1_1_http_client.html#a64f1bd2c215b041eaed6e5c4520b4dbf',1,'Nuria::HttpClient']]],
+  ['postbodyreader',['postBodyReader',['../class_nuria_1_1_http_client.html#ae87f7ee41e8e45f3740dacb71bf76ac9',1,'Nuria::HttpClient']]],
   ['postbodytransferred',['postBodyTransferred',['../class_nuria_1_1_http_client.html#aeed15fc59cbc42bdb25daeec1fe131fc',1,'Nuria::HttpClient']]],
   ['privatekey',['privateKey',['../class_nuria_1_1_http_server.html#a27e0518c9c7ca23abb60bb996ee40dfc',1,'Nuria::HttpServer']]],
   ['put',['PUT',['../class_nuria_1_1_http_client.html#a47878d81d933a0f4b50c97a11c343456a934ae585a09893c6913f3751d6b11aa5',1,'Nuria::HttpClient']]]
