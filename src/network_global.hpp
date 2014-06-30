@@ -15,15 +15,15 @@
  *       distribution.
  */
 
-#ifndef NETWORK_GLOBAL_HPP
-#define NETWORK_GLOBAL_HPP
+#ifndef NURIA_NETWORK_GLOBAL_HPP
+#define NURIA_NETWORK_GLOBAL_HPP
 
 #include <QtCore/qglobal.h>
 
-#if defined(NETWORK_LIBRARY)
+#if defined(NURIA_NETWORK_LIBRARY)
 #  define NURIA_NETWORK_EXPORT Q_DECL_EXPORT
 #else
 #  define NURIA_NETWORK_EXPORT Q_DECL_IMPORT
 #endif
 
-#endif // NETWORK_GLOBAL_HPP
+#endif // NURIA_NETWORK_GLOBAL_HPP

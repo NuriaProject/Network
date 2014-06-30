@@ -1,4 +1,4 @@
 *.o
 *_moc.cpp
-*.pro.user*
+*.user*
 Makefile
