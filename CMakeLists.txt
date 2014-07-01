@@ -42,7 +42,7 @@ SET(NuriaNetwork_SRC
 )
 
 # C++11
-LIST(APPEND CMAKE_CXX_FLAGS "-std=c++11")
+LIST(APPEND CMAKE_CXX_FLAGS "-std=c++11 -DNURIA_NETWORK_LIBRARY")
 
 # Create build target
 ADD_LIBRARY(NuriaNetwork SHARED ${NuriaNetwork_SRC})
@@ -57,7 +57,11 @@ set_target_properties(
 )
 
 # Install target
-INSTALL(TARGETS NuriaNetwork LIBRARY DESTINATION lib)
+INSTALL(TARGETS NuriaNetwork 
+		LIBRARY DESTINATION lib
+		ARCHIVE DESTINATION lib
+		RUNTIME DESTINATION lib
+)
 INSTALL(DIRECTORY src/ DESTINATION include/nuria/network
         FILES_MATCHING PATTERN "*.hpp"
         PATTERN "private" EXCLUDE
