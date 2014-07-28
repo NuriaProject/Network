@@ -20,7 +20,7 @@
 
 #include <QtCore/qglobal.h>
 
-#if defined(NURIA_NETWORK_LIBRARY)
+#if defined(NuriaNetwork_EXPORTS)
 #  define NURIA_NETWORK_EXPORT Q_DECL_EXPORT
 #else
 #  define NURIA_NETWORK_EXPORT Q_DECL_IMPORT
