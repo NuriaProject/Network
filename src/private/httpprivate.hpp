@@ -18,7 +18,7 @@
 #ifndef NURIA_HTTPPRIVATE_HPP
 #define NURIA_HTTPPRIVATE_HPP
 
-#include "../httpclient.hpp"
+#include "../nuria/httpclient.hpp"
 
 #include <QDateTime>
 

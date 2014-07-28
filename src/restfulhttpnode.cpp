@@ -15,13 +15,13 @@
  *       distribution.
  */
 
-#include "restfulhttpnode.hpp"
+#include "nuria/restfulhttpnode.hpp"
 
 #include <QRegularExpression>
-#include <serializer.hpp>
+#include <nuria/serializer.hpp>
 #include <QJsonDocument>
-#include <callback.hpp>
-#include <debug.hpp>
+#include <nuria/callback.hpp>
+#include <nuria/debug.hpp>
 
 enum { NumberOfHandlers = 5 };
 

@@ -15,7 +15,7 @@
  *       distribution.
  */
 
-#include "httpclient.hpp"
+#include "nuria/httpclient.hpp"
 
 #include <QSslSocket>
 #include <QTcpSocket>
@@ -27,14 +27,14 @@
 // We need gmtime_r
 #include <ctime>
 
-#include <temporarybufferdevice.hpp>
-#include "httpmultipartreader.hpp"
-#include "httptransport.hpp"
-#include "httpparser.hpp"
-#include "httpserver.hpp"
-#include "httpwriter.hpp"
-#include "httpnode.hpp"
-#include <debug.hpp>
+#include <nuria/temporarybufferdevice.hpp>
+#include "nuria/httpmultipartreader.hpp"
+#include "nuria/httptransport.hpp"
+#include "nuria/httpparser.hpp"
+#include "nuria/httpserver.hpp"
+#include "nuria/httpwriter.hpp"
+#include "nuria/httpnode.hpp"
+#include <nuria/debug.hpp>
 
 #include "private/httpprivate.hpp"
 

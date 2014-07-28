@@ -15,7 +15,7 @@
  *       distribution.
  */
 
-#include "sslserver.hpp"
+#include "nuria/sslserver.hpp"
 
 #include <QSslSocket>
 

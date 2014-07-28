@@ -15,7 +15,7 @@
  *       distribution.
  */
 
-#include "httptransport.hpp"
+#include "nuria/httptransport.hpp"
 
 Nuria::HttpTransport::HttpTransport (QObject *parent)
 	: QIODevice (parent)

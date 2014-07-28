@@ -20,7 +20,7 @@
 
 #include "network_global.hpp"
 #include "httpclient.hpp"
-#include "callback.hpp"
+#include <nuria/callback.hpp>
 #include <QSharedData>
 #include <QObject>
 #include <QDir>

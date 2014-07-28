@@ -15,12 +15,12 @@
  *       distribution.
  */
 
-#include "httpmultipartreader.hpp"
+#include "nuria/httpmultipartreader.hpp"
 
-#include <temporarybufferdevice.hpp>
-#include "httpclient.hpp"
-#include "httpparser.hpp"
-#include <debug.hpp>
+#include <nuria/temporarybufferdevice.hpp>
+#include "nuria/httpclient.hpp"
+#include "nuria/httpparser.hpp"
+#include <nuria/debug.hpp>
 #include <QIODevice>
 #include <QMap>
 

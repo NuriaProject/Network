@@ -15,13 +15,13 @@
  *       distribution.
  */
 
-#include "httpnode.hpp"
+#include "nuria/httpnode.hpp"
 #include <QMetaMethod>
 #include <QDir>
 
 #include "private/httpprivate.hpp"
-#include "httpserver.hpp"
-#include <debug.hpp>
+#include "nuria/httpserver.hpp"
+#include <nuria/debug.hpp>
 
 // Note: HttpNodePrivate and SlotInfoPrivate are defined in private/httpprivate.hpp!
 

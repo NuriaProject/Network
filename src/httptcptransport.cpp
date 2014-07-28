@@ -15,7 +15,7 @@
  *       distribution.
  */
 
-#include "httptcptransport.hpp"
+#include "nuria/httptcptransport.hpp"
 
 #include <QSslSocket>
 #include <QTcpSocket>

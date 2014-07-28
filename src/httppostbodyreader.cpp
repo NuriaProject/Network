@@ -15,7 +15,7 @@
  *       distribution.
  */
 
-#include "httppostbodyreader.hpp"
+#include "nuria/httppostbodyreader.hpp"
 
 Nuria::HttpPostBodyReader::HttpPostBodyReader (QObject *parent)
 	: QObject (parent)

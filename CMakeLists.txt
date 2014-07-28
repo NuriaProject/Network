@@ -16,28 +16,28 @@ FIND_PACKAGE(Qt5Network REQUIRED)
 # 
 SET(NuriaNetwork_SRC
     src/httpclient.cpp
-    src/httpclient.hpp
+    src/nuria/httpclient.hpp
     src/httpmultipartreader.cpp
-    src/httpmultipartreader.hpp
+    src/nuria/httpmultipartreader.hpp
     src/httpnode.cpp
-    src/httpnode.hpp
+    src/nuria/httpnode.hpp
     src/httpparser.cpp
-    src/httpparser.hpp
+    src/nuria/httpparser.hpp
     src/httppostbodyreader.cpp
-    src/httppostbodyreader.hpp
+    src/nuria/httppostbodyreader.hpp
     src/httpserver.cpp
-    src/httpserver.hpp
+    src/nuria/httpserver.hpp
     src/httptcptransport.cpp
-    src/httptcptransport.hpp
+    src/nuria/httptcptransport.hpp
     src/httptransport.cpp
-    src/httptransport.hpp
+    src/nuria/httptransport.hpp
     src/httpwriter.cpp
-    src/httpwriter.hpp
-    src/network_global.hpp
+    src/nuria/httpwriter.hpp
+    src/nuria/network_global.hpp
     src/restfulhttpnode.cpp
-    src/restfulhttpnode.hpp
+    src/nuria/restfulhttpnode.hpp
     src/sslserver.cpp
-    src/sslserver.hpp
+    src/nuria/sslserver.hpp
     src/private/httpprivate.hpp
 )
 
@@ -64,7 +64,7 @@ INSTALL(TARGETS NuriaNetwork
         RUNTIME DESTINATION lib
 )
 
-INSTALL(DIRECTORY src/ DESTINATION include/nuria
+INSTALL(DIRECTORY src/nuria/ DESTINATION include/nuria
         FILES_MATCHING PATTERN "*.hpp"
         PATTERN "private" EXCLUDE
 )

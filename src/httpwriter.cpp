@@ -15,11 +15,11 @@
  *       distribution.
  */
 
-#include "httpwriter.hpp"
+#include "nuria/httpwriter.hpp"
 
 #include <QDateTime>
 
-#include "httpclient.hpp"
+#include "nuria/httpclient.hpp"
 
 Nuria::HttpWriter::HttpWriter () {
 	

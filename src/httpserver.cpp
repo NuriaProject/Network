@@ -15,18 +15,18 @@
  *       distribution.
  */
 
-#include "httpserver.hpp"
+#include "nuria/httpserver.hpp"
 
 #include <QMetaMethod>
 #include <QStringList>
 #include <QTcpServer>
 #include <QDir>
 
-#include "httptcptransport.hpp"
-#include "httpclient.hpp"
-#include "sslserver.hpp"
-#include "httpnode.hpp"
-#include <debug.hpp>
+#include "nuria/httptcptransport.hpp"
+#include "nuria/httpclient.hpp"
+#include "nuria/sslserver.hpp"
+#include "nuria/httpnode.hpp"
+#include <nuria/debug.hpp>
 
 #include "private/httpprivate.hpp"
 

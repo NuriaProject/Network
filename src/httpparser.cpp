@@ -15,7 +15,7 @@
  *       distribution.
  */
 
-#include "httpparser.hpp"
+#include "nuria/httpparser.hpp"
 
 Nuria::HttpParser::HttpParser () {
 	
