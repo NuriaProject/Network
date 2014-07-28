@@ -43,7 +43,6 @@ SET(NuriaNetwork_SRC
 
 # C++11
 LIST(APPEND CMAKE_CXX_FLAGS "-std=c++11")
-add_definitions(-DNURIA_NETWORK_LIBRARY)
 
 # Create build target
 ADD_LIBRARY(NuriaNetwork SHARED ${NuriaNetwork_SRC})
@@ -68,3 +67,11 @@ INSTALL(DIRECTORY src/nuria/ DESTINATION include/nuria
         FILES_MATCHING PATTERN "*.hpp"
         PATTERN "private" EXCLUDE
 )
+
+# Unittests
+enable_testing()
+add_unittest(NAME tst_httpclient QT Network NURIA NuriaNetwork SRC tests/httpmemorytransport.hpp tests/httpmemorytransport.cpp)
+add_unittest(NAME tst_httpmultipartreader QT Network NURIA NuriaNetwork)
+add_unittest(NAME tst_httpparser QT Network NURIA NuriaNetwork)
+add_unittest(NAME tst_httpwriter QT Network NURIA NuriaNetwork)
+add_unittest(NAME tst_restfulhttpnode QT Network NURIA NuriaNetwork SRC tests/httpmemorytransport.hpp tests/httpmemorytransport.cpp tests/testnode.hpp)
