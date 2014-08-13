@@ -3,7 +3,7 @@
 cmake_minimum_required(VERSION 2.8.8)
 
 # Base configuration
-PROJECT(NuriaCore)
+PROJECT(NuriaNetwork)
 
 # Enable moc
 SET(CMAKE_AUTOMOC ON)
