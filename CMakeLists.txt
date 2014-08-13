@@ -68,3 +68,13 @@ INSTALL(DIRECTORY src/nuria/ DESTINATION include/nuria
         FILES_MATCHING PATTERN "*.hpp"
         PATTERN "private" EXCLUDE
 )
+
+# Add Tests
+enable_testing()
+add_unittest(NAME tst_httpclient QT Network NURIA NuriaNetwork
+             SOURCES httpmemorytransport.cpp httpmemorytransport.hpp)
+add_unittest(NAME tst_httpmultipartreader QT Network NURIA NuriaNetwork)
+add_unittest(NAME tst_httpparser QT Network NURIA NuriaNetwork)
+add_unittest(NAME tst_httpwriter QT Network NURIA NuriaNetwork)
+add_unittest(NAME tst_restfulhttpnode QT Network NURIA NuriaNetwork
+             SOURCES httpmemorytransport.cpp httpmemorytransport.hpp testnode.hpp)
