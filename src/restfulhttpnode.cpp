@@ -117,24 +117,27 @@ QByteArray Nuria::RestfulHttpNode::convertVariantToData (const QVariant &variant
 	}
 	
 	// 
-	QVariant tryToString = Variant::convert< QString > (variant);
-	if (tryToString.isValid ()) {
+	QVariant tryToString = variant;
+	if (tryToString.convert (QMetaType::QString)) {
 		return tryToString.toString ().toUtf8 ();
 	}
 	
 	// 
-	QVariant tryToByteArray = Variant::convert< QByteArray > (variant);
+	QVariant tryToByteArray = variant;
+	tryToByteArray.convert (QMetaType::QByteArray);
 	return tryToByteArray.toByteArray ();
 	
 }
 
 QVariant Nuria::RestfulHttpNode::convertArgumentToVariant (const QString &argumentData, int targetType) {
+	QVariant variant = argumentData;
+	
 	if (targetType == QMetaType::QVariant) {
-		return argumentData;
+		return variant;
 	}
 	
 	// 
-	QVariant variant = Variant::convert (argumentData, targetType);
+	variant.convert (targetType);
 	return variant;
 }
 
