@@ -41,8 +41,7 @@ SET(NuriaNetwork_SRC
     src/private/httpprivate.hpp
 )
 
-# C++11
-LIST(APPEND CMAKE_CXX_FLAGS "-std=c++11")
+# 
 add_definitions(-DNURIA_NETWORK_LIBRARY)
 
 # Create build target
