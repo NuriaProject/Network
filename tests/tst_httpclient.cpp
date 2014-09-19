@@ -52,7 +52,7 @@ bool TestNode::invokePath (const QString &path, const QStringList &parts,
 		
 	} else if (path == "/to_process") {
 		QProcess *process = new QProcess;
-		process->start ("/usr/bin/tac", QStringList ());
+		process->start ("tac", QStringList ());
 		process->setReadChannel (QProcess::StandardOutput);
 		client->pipeFromPostBody (process);
 		client->pipeToClient (process);
@@ -76,7 +76,7 @@ bool TestNode::invokePath (const QString &path, const QStringList &parts,
 		
 	} else if (path == "/process") {
 		QProcess *process = new QProcess;
-		process->start ("/usr/bin/echo", { "hello" });
+		process->start ("echo", { "hello" });
 		process->setReadChannel (QProcess::StandardOutput);
 		client->pipeToClient (process);
 		

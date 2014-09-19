@@ -116,7 +116,7 @@ void RestfulHttpNodeTest::invokeAnnotatedHandler () {
 	QByteArray outData = transport->outData ();
 	outData.replace (' ', ""); // Remove spaces to be consistent across Qt versions.
 	
-	QCOMPARE(transport->outData (), QByteArray ("{\"boolean\":true,\"integer\":123,\"string\":\"foo\"}"));
+	QCOMPARE(outData, QByteArray ("{\"boolean\":true,\"integer\":123,\"string\":\"foo\"}"));
 }
 
 void RestfulHttpNodeTest::invokeAnnotatedSpecificHandler_data () {
