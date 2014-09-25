@@ -244,7 +244,7 @@ void HttpClientTest::postWithChunkedTransfer () {
 			   "Expect: 100-continue\r\n"
 			   "\r\n"
 			   "0123456789";
-	QByteArray expected = "HTTP/1.1 100 Continue\r\n"
+	QByteArray expected = "HTTP/1.1 100 Continue\r\n\r\n"
 			      "HTTP/1.1 200 OK\r\n"
 			      "Connection: Close\r\nDate: %%\r\n\r\n"
 			      "0123456789";
