@@ -19,6 +19,8 @@ SET(NuriaNetwork_SRC
     src/nuria/httpclient.hpp
     src/httpmultipartreader.cpp
     src/nuria/httpmultipartreader.hpp
+    src/httpurlencodedreader.cpp
+    src/nuria/httpurlencodedreader.hpp
     src/httpnode.cpp
     src/nuria/httpnode.hpp
     src/httpparser.cpp
@@ -73,6 +75,7 @@ enable_testing()
 add_unittest(NAME tst_httpclient QT Network NURIA NuriaNetwork
              SOURCES httpmemorytransport.cpp httpmemorytransport.hpp)
 add_unittest(NAME tst_httpmultipartreader QT Network NURIA NuriaNetwork)
+add_unittest(NAME tst_httpurlencodedreader QT Network NURIA NuriaNetwork)
 add_unittest(NAME tst_httpparser QT Network NURIA NuriaNetwork)
 add_unittest(NAME tst_httpwriter QT Network NURIA NuriaNetwork)
 add_unittest(NAME tst_restfulhttpnode QT Network NURIA NuriaNetwork

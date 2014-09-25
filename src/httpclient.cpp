@@ -28,6 +28,7 @@
 #include <ctime>
 
 #include <nuria/temporarybufferdevice.hpp>
+#include "nuria/httpurlencodedreader.hpp"
 #include "nuria/httpmultipartreader.hpp"
 #include "nuria/httptransport.hpp"
 #include "nuria/httpparser.hpp"
@@ -330,6 +331,10 @@ bool Nuria::HttpClient::contentTypeIsMultipart (const QByteArray &value) const {
 	return value.startsWith ("multipart/form-data;");
 }
 
+bool Nuria::HttpClient::contentTypeIsUrlEncoded (const QByteArray &value) const {
+	return value.startsWith ("application/x-www-form-urlencoded");
+}
+
 Nuria::HttpPostBodyReader *Nuria::HttpClient::createHttpMultiPartReader (const QByteArray &header) {
 	static const QByteArray boundaryStr = QByteArrayLiteral("boundary=");
 	int idx = header.indexOf (boundaryStr);
@@ -346,6 +351,19 @@ Nuria::HttpPostBodyReader *Nuria::HttpClient::createHttpMultiPartReader (const Q
 	
 	// 
 	return new HttpMultiPartReader (this, boundary, this);
+}
+
+Nuria::HttpPostBodyReader *Nuria::HttpClient::createUrlEncodedPartReader (const QByteArray &header) {
+	static const QByteArray charsetStr = QByteArrayLiteral("charset:");
+	int idx = header.indexOf (charsetStr);
+	
+	QByteArray charset = QByteArrayLiteral("latin-1");
+	if (idx != -1) {
+		charset = header.mid (idx + charsetStr.length ());
+	}
+	
+	// 
+	return new HttpUrlEncodedReader (this, charset, this);
 }
 
 bool Nuria::HttpClient::sendPipeChunkToClient () {
@@ -904,6 +922,11 @@ Nuria::HttpPostBodyReader *Nuria::HttpClient::postBodyReader () {
 	// HTTP multi-part ?
 	if (contentTypeIsMultipart (contentType)) {
 		reader = createHttpMultiPartReader (contentType);
+	}
+	
+	// Url-encoded?
+	if (contentTypeIsUrlEncoded (contentType)) {
+		reader = createUrlEncodedPartReader (contentType);
 	}
 	
 	// Done.

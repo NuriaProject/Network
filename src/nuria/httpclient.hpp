@@ -662,7 +662,9 @@ private:
 	bool requestHasPostBody () const;
 	bool postProcessRequestHeader ();
 	bool contentTypeIsMultipart (const QByteArray &value) const;
+	bool contentTypeIsUrlEncoded (const QByteArray &value) const;
 	HttpPostBodyReader *createHttpMultiPartReader (const QByteArray &header);
+	HttpPostBodyReader *createUrlEncodedPartReader (const QByteArray &header);
 	
 	/**
 	 * Sends a chunk of the pipeToClient() device to the client.
