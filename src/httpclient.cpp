@@ -173,6 +173,7 @@ bool Nuria::HttpClient::send100ContinueIfClientExpectsIt () {
 	
 	// Respond with '100 Continue'
 	this->d_ptr->transport->write (writer.writeResponseLine (Http1_1, 100, QByteArray ()));
+	this->d_ptr->transport->write ("\r\n");
 	this->d_ptr->transport->flush ();
 	
 	return true;
@@ -916,7 +917,15 @@ bool Nuria::HttpClient::atEnd () const {
 	}
 	
 	// 
+	if (this->d_ptr->postBodyTransferred < this->d_ptr->postBodyLength) {
+		return false;
+	}
+	
 	return this->d_ptr->bufferDevice->atEnd ();
+}
+
+qint64 Nuria::HttpClient::bytesAvailable () const {
+	return QIODevice::bytesAvailable () + this->d_ptr->bufferDevice->bytesAvailable ();
 }
 
 qint64 Nuria::HttpClient::pos () const {
