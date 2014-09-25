@@ -153,7 +153,7 @@ bool Nuria::HttpClient::readPostBodyContentLength () {
 bool Nuria::HttpClient::send100ContinueIfClientExpectsIt () {
 	static const QByteArray continue100 = QByteArrayLiteral("100-continue");
 	
-	if (!requestHasPostBody ()) {
+	if (!requestHasPostBody () || this->d_ptr->headerSent) {
 		return true;
 	}
 	
