@@ -64,6 +64,7 @@ Nuria::HttpMultiPartReader::HttpMultiPartReader (QIODevice *device, const QByteA
 	
 	this->d_ptr->device = device;
 	this->d_ptr->boundary = boundary;
+	this->d_ptr->boundary.prepend ("--");
 	
 	// 
 	connect (device, &QIODevice::readyRead, this, &HttpMultiPartReader::processData);

@@ -82,7 +82,7 @@ private:
 };
 
 void HttpMultiPartReaderTest::happyPath () {
-	HttpMultiPartReader reader (createBuffer (this->input), "--asdasdasd");
+	HttpMultiPartReader reader (createBuffer (this->input), "asdasdasd");
 	
 	QVERIFY(!reader.hasFailed ());
 	QVERIFY(reader.isComplete ());
@@ -116,7 +116,7 @@ void HttpMultiPartReaderTest::fragmentedTransfer () {
 	TestBuffer *buffer = createBuffer (part1);
 	buffer->isAtEnd = false;
 	
-	HttpMultiPartReader reader (buffer, "--asdasdasd");
+	HttpMultiPartReader reader (buffer, "asdasdasd");
 	QSignalSpy fieldFoundSpy (&reader, SIGNAL(fieldFound(QString)));
 	QSignalSpy fieldCompletedSpy (&reader, SIGNAL(fieldCompleted(QString)));
 	QSignalSpy completedSpy (&reader, SIGNAL(completed(bool)));
@@ -196,7 +196,7 @@ void HttpMultiPartReaderTest::bytePerByteTransfer () {
 	TestBuffer *buffer = createBuffer ("");
 	buffer->isAtEnd = false;
 	
-	HttpMultiPartReader reader (buffer, "--asdasdasd");
+	HttpMultiPartReader reader (buffer, "asdasdasd");
 	
 	// 
 	for (int i = 0; i < this->input.length (); i++) {
@@ -232,7 +232,7 @@ void HttpMultiPartReaderTest::valueStreaming () {
 					   "Content-Type: text/plain\r\n\r\n");
 	buffer->isAtEnd = false;
 	
-	HttpMultiPartReader reader (buffer, "--asdasdasd");
+	HttpMultiPartReader reader (buffer, "asdasdasd");
 	
 	// 
 	QIODevice *foo; 
