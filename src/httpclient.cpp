@@ -268,6 +268,7 @@ bool Nuria::HttpClient::verifyCompleteHeader () {
 	if (this->d_ptr->requestVersion == HttpUnknown ||
 	    this->d_ptr->requestType == InvalidVerb ||
 	    this->d_ptr->path.path ().isEmpty ()) {
+		killConnection (400);
 		return false;
 	}
 	
@@ -313,9 +314,9 @@ bool Nuria::HttpClient::requestHasPostBody () const {
 bool Nuria::HttpClient::postProcessRequestHeader () {
 	if (verifyRequestBodyOrClose () &&
 	    verifyCompleteHeader () &&
-	    invokeRequestedPath () &&
 	    readPostBodyContentLength () &&
-	    send100ContinueIfClientExpectsIt ()) {
+	    send100ContinueIfClientExpectsIt () &&
+	    invokeRequestedPath ()) {
 		return true;
 	}
 	

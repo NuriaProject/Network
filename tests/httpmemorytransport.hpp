@@ -48,8 +48,9 @@ public:
 	}
 	
 	void setIncoming (const QByteArray &data) {
-		ingoing->write (data);
-		ingoing->reset ();
+		ingoing->close ();
+		ingoing->setData (data);
+		ingoing->open (QIODevice::ReadOnly);
 		emit readyRead ();
 	}
 	

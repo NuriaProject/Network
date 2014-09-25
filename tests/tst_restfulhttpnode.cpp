@@ -38,6 +38,8 @@ private slots:
 	void invokeAnnotatedSpecificHandler_data ();
 	void invokeAnnotatedSpecificHandler ();
 	
+	void invokeNonStreamingPostHandlerLater ();
+	
 private:
 	HttpClient *createClient (const QByteArray &method, bool withBody = false) {
 		HttpMemoryTransport *transport = new HttpMemoryTransport;
@@ -139,6 +141,40 @@ void RestfulHttpNodeTest::invokeAnnotatedSpecificHandler () {
 	QByteArray result = transport->outData ().split ('\n').last ();
 	QByteArray expected = method.toLatin1 () + " 42";
 	QCOMPARE(result, expected);
+}
+
+void RestfulHttpNodeTest::invokeNonStreamingPostHandlerLater () {
+	QTest::ignoreMessage (QtDebugMsg, "1 2 3 1234567890");
+	bool invoked = false;
+	
+	Callback cb = Callback::fromLambda ([&](int one, int two, int three, HttpClient *client) {
+		qDebug("%i %i %i %s", one, two, three, client->readAll ().constData ());
+		invoked = true;
+	});
+	
+	// 
+	node->setRestfulHandler ("nostream/{one}-{two}/{three}", { "one", "two", "three" }, cb, true);
+	
+	// Create client
+	HttpMemoryTransport *transport = new HttpMemoryTransport;
+	HttpClient *postClient = new HttpClient (transport, server);
+	
+	// Invoke
+	transport->setIncoming ("POST /api/nostream/1-2/3 HTTP/1.0\r\n"
+				"Content-Length: 10\r\n\r\n12345678");
+	qApp->processEvents ();
+	QVERIFY(postClient->slotInfo ().isValid ());
+	
+	// 
+	QVERIFY(!invoked);
+	transport->ingoing->close ();
+	transport->ingoing->setData (transport->ingoing->data () + "90");
+	transport->ingoing->open (QIODevice::ReadOnly);
+	transport->ingoing->seek (transport->ingoing->data ().length () - 2);
+	emit transport->readyRead ();
+	
+	QVERIFY(invoked);
+	
 }
 
 QTEST_MAIN(RestfulHttpNodeTest)

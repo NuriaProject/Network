@@ -28,6 +28,7 @@ enum { NumberOfHandlers = 5 };
 struct InvokeInfo {
 	Nuria::Callback callback;
 	QStringList argNames;
+	bool waitForRequestBody;
 };
 
 namespace Nuria {
@@ -74,8 +75,8 @@ Nuria::RestfulHttpNode::~RestfulHttpNode () {
 }
 
 void Nuria::RestfulHttpNode::setRestfulHandler (Nuria::HttpClient::HttpVerbs verbs, const QString &path,
-						const QStringList &argumentNames,
-						const Nuria::Callback &callback) {
+						const QStringList &argumentNames, const Nuria::Callback &callback,
+                                                bool waitForRequestPostBody) {
 	QString compiled = compilePathRegEx (path);
 	
 	// Find control structure
@@ -91,6 +92,7 @@ void Nuria::RestfulHttpNode::setRestfulHandler (Nuria::HttpClient::HttpVerbs ver
 	InvokeInfo info;
 	info.callback = callback;
 	info.argNames = argumentNames;
+	info.waitForRequestBody = waitForRequestPostBody;
 	
 	// Store
 	if (verbs & HttpClient::GET) it->handlers[0] = info;
@@ -102,8 +104,8 @@ void Nuria::RestfulHttpNode::setRestfulHandler (Nuria::HttpClient::HttpVerbs ver
 }
 
 void Nuria::RestfulHttpNode::setRestfulHandler (const QString &path, const QStringList &argumentNames,
-						const Nuria::Callback &callback) {
-	setRestfulHandler (HttpClient::AllVerbs, path, argumentNames, callback);
+						const Nuria::Callback &callback, bool waitForRequestPostBody) {
+	setRestfulHandler (HttpClient::AllVerbs, path, argumentNames, callback, waitForRequestPostBody);
 }
 
 QByteArray Nuria::RestfulHttpNode::convertVariantToData (const QVariant &variant) {
@@ -198,7 +200,8 @@ bool Nuria::RestfulHttpNode::invokePath (const QString &path, const QStringList 
 	delayedRegisterMetaObject ();
 	
 	// 
-	if (!allowAccessToClient (path, parts, index, client)) {
+	if (client->verb () == HttpClient::InvalidVerb ||
+	    !allowAccessToClient (path, parts, index, client)) {
 		return false;
 	}
 	
@@ -345,6 +348,29 @@ QString Nuria::RestfulHttpNode::compilePathRegEx (QString path) {
 	return path;
 }
 
+bool Nuria::RestfulHttpNode::invokeMatchLater (Callback callback, const QVariantList &arguments, HttpClient *client) {
+	Callback invoker (this, &RestfulHttpNode::invokeMatchNow);
+	invoker.bind (callback, arguments);
+	
+	SlotInfo slotInfo (invoker);
+	client->setSlotInfo (slotInfo);
+	return true;
+}
+
+bool Nuria::RestfulHttpNode::invokeMatchNow (Callback callback, const QVariantList &arguments, HttpClient *client) {
+	int resultType = callback.returnType ();
+	QVariant result = callback.invoke (arguments);
+	
+	if ((resultType == QMetaType::QVariant && !result.isValid ()) ||
+	    (resultType != QMetaType::Void && resultType != 0 &&
+	     resultType != result.userType ())) {
+	        return false;
+	}
+	
+	// Send response
+	return writeResponse (result, client);
+}
+
 bool Nuria::RestfulHttpNode::invokeMatch (Internal::RestfulHttpNodeSlotData &slotData,
 					  QRegularExpressionMatch &match, HttpClient *client) {
 	InvokeInfo &info = findInvokeInfo (slotData, client);
@@ -358,18 +384,14 @@ bool Nuria::RestfulHttpNode::invokeMatch (Internal::RestfulHttpNodeSlotData &slo
 		return false;
 	}
 	
-	// Invoke
-	int resultType = info.callback.returnType ();
-	QVariant result = info.callback.invoke (arguments);
-	
-	if ((resultType == QMetaType::QVariant && !result.isValid ()) ||
-	    (resultType != QMetaType::Void && resultType != 0 &&
-	     resultType != result.userType ())) {
-		return false;
+	// Wait for POST body if we're not streaming.
+	if (info.waitForRequestBody && client->postBodyLength () > 0 &&
+	    client->postBodyLength () > client->postBodyTransferred ()) {
+		return invokeMatchLater (info.callback, arguments, client);
 	}
 	
-	// Send response
-	return writeResponse (result, client);
+	// Invoke
+	return invokeMatchNow (info.callback, arguments, client);
 }
 
 QVariantList Nuria::RestfulHttpNode::argumentValues (const QStringList &names, const QList< int > &types,

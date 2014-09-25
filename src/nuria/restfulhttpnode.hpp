@@ -23,6 +23,8 @@
 
 /**
  * Annotation to set the RESTful path pattern of a method.
+ * \note When a POST/PUT requests is received, the annotated method will be
+ * invoked when the whole body has been received.
  */
 #define NURIA_RESTFUL(Path) NURIA_ANNOTATE(org.nuriaproject.network.restful, Path)
 
@@ -135,12 +137,17 @@ public:
 	 * arguments are read from the requested path as defined in \a path and
 	 * are passed to \a callback in the order defined by \a argumentNames.
 	 * 
+	 * When dealing with POST/PUT bodies, the default is to wait for the
+	 * whole body to be received and then invoke the handler. This can be
+	 * overriden by passing \c false for \a waitForRequestPostBody.
+	 * 
 	 * \note When \a callback expects a argument of type
 	 * 'Nuria::HttpClient*', the name of this argument is expected to be
 	 * \b omitted in \a argumentNames!
 	 */
 	void setRestfulHandler (HttpClient::HttpVerbs verbs, const QString &path,
-				const QStringList &argumentNames, const Callback &callback);
+				const QStringList &argumentNames, const Callback &callback,
+	                        bool waitForRequestPostBody = true);
 	
 	/**
 	 * \overload
@@ -148,7 +155,7 @@ public:
 	 * of HttpClient::AllVerbs for \a verbs.
 	 */
 	void setRestfulHandler (const QString &path, const QStringList &argumentNames,
-				const Callback &callback);
+				const Callback &callback, bool waitForRequestPostBody = true);
 	
 protected:
 	
@@ -196,6 +203,8 @@ private:
 	void delayedRegisterMetaObject ();
 	QStringList argumentNamesWithoutClient (MetaMethod &method);
 	QString compilePathRegEx (QString path);
+	bool invokeMatchLater (Callback callback, const QVariantList &arguments, HttpClient *client);
+	bool invokeMatchNow (Callback callback, const QVariantList &arguments, HttpClient *client);
 	bool invokeMatch (Internal::RestfulHttpNodeSlotData &slotData,
 			  QRegularExpressionMatch &match, HttpClient *client);
 	QVariantList argumentValues (const QStringList &names, const QList<int> &types,
