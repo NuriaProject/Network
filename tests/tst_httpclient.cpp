@@ -28,6 +28,7 @@ class TestNode : public HttpNode {
 	Q_OBJECT
 public:
 	QBuffer *fromClientBuffer;
+	QByteArray readerClassName;
 	
 	TestNode (QObject *parent) : HttpNode (parent) {
 		fromClientBuffer = new QBuffer (this);
@@ -56,6 +57,14 @@ bool TestNode::invokePath (const QString &path, const QStringList &parts,
 		process->setReadChannel (QProcess::StandardOutput);
 		client->pipeFromPostBody (process);
 		client->pipeToClient (process);
+		
+	} else if (path == "/reader") {
+		HttpPostBodyReader *reader = client->postBodyReader ();
+		readerClassName.clear ();
+		
+		if (client->hasReadablePostBody () && reader) {
+			readerClassName = reader->metaObject ()->className ();
+		}
 		
 	} else  if (client->verb () == HttpClient::POST) {
 		SlotInfo info (&dummy);
@@ -107,6 +116,9 @@ private slots:
 	void pipeToClientProcess ();
 	void pipeFromClientBuffer ();
 	void pipeFromClientProcess ();
+	void bodyReaderForMultipart ();
+	void bodyReaderForMultipartNoBoundaryGiven ();
+	void bodyReaderForUrlEncoded ();
 	
 private:
 	
@@ -366,6 +378,34 @@ void HttpClientTest::pipeFromClientProcess () {
 	
 	QCOMPARE(transport->outData (), expected);
 	QVERIFY(!transport->isOpen ());
+}
+
+void HttpClientTest::bodyReaderForMultipart () {
+	QByteArray input = "POST /reader HTTP/1.0\r\n"
+	                   "Content-Type: multipart/form-data; boundary=asdasdasd\r\n"
+	                   "Content-Length: 10\r\n\r\n0123456789";
+	
+	HttpClient *client = createClient (input);
+	QCOMPARE(node->readerClassName, QByteArray ("Nuria::HttpMultiPartReader"));
+}
+
+void HttpClientTest::bodyReaderForMultipartNoBoundaryGiven () {
+	QByteArray input = "POST /reader HTTP/1.0\r\n"
+	                   "Content-Type: multipart/form-data; \r\n"
+	                   "Content-Length: 10\r\n\r\n0123456789";
+	
+	HttpClient *client = createClient (input);
+	QVERIFY(node->readerClassName.isEmpty ());
+	
+}
+
+void HttpClientTest::bodyReaderForUrlEncoded () {
+	QByteArray input = "POST /reader HTTP/1.0\r\n"
+	                   "Content-Type: application/x-www-form-urlencoded; charset=UTF-8\r\n"
+	                   "Content-Length: 10\r\n\r\n0123456789";
+	
+	HttpClient *client = createClient (input);
+	QCOMPARE(node->readerClassName, QByteArray ("Nuria::HttpUrlEncodedReader"));
 }
 
 QTEST_MAIN(HttpClientTest)
