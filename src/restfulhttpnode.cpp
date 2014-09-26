@@ -161,6 +161,7 @@ QByteArray Nuria::RestfulHttpNode::generateResultData (QVariant result, Nuria::H
 		return result.toString ().toUtf8 ();
 	case QMetaType::QVariantMap:
 	case QMetaType::QVariantList: {
+		addJsonContentTypeHeaderToResponse (client);
 		return QJsonDocument::fromVariant (result).toJson (QJsonDocument::Compact);
 	} break;
 	}
@@ -176,6 +177,7 @@ QByteArray Nuria::RestfulHttpNode::generateResultData (QVariant result, Nuria::H
 	}
 	
 	// Serialize map to JSON.
+	addJsonContentTypeHeaderToResponse (client);
 	return QJsonDocument::fromVariant (serialized).toJson (QJsonDocument::Compact);
 }
 
@@ -436,6 +438,15 @@ bool Nuria::RestfulHttpNode::writeResponse (const QVariant &response, Nuria::Htt
 	// 
 	client->write (responseData);
 	return true;
+}
+
+void Nuria::RestfulHttpNode::addJsonContentTypeHeaderToResponse (HttpClient *client) {
+	static const QByteArray json = QByteArrayLiteral("application/json");
+	
+	if (!client->hasResponseHeader (HttpClient::HeaderContentType)) {
+		client->setResponseHeader (HttpClient::HeaderContentType, json);
+	}
+	
 }
 
 void Nuria::RestfulHttpNode::registerMetaMethod (MetaMethod &method) {

@@ -111,7 +111,6 @@ class MetaObject;
  */
 class NURIA_NETWORK_EXPORT RestfulHttpNode : public HttpNode {
 	Q_OBJECT
-	Q_ENUMS(ReplyFormat)
 public:
 	
 	/**
@@ -210,6 +209,7 @@ private:
 	QVariantList argumentValues (const QStringList &names, const QList<int> &types,
 				     QRegularExpressionMatch &match, HttpClient *client);
 	bool writeResponse (const QVariant &response, HttpClient *client);
+	void addJsonContentTypeHeaderToResponse (HttpClient *client);
 	
 	RestfulHttpNodePrivate *d_ptr;
 	

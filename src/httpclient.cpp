@@ -354,7 +354,7 @@ Nuria::HttpPostBodyReader *Nuria::HttpClient::createHttpMultiPartReader (const Q
 }
 
 Nuria::HttpPostBodyReader *Nuria::HttpClient::createUrlEncodedPartReader (const QByteArray &header) {
-	static const QByteArray charsetStr = QByteArrayLiteral("charset:");
+	static const QByteArray charsetStr = QByteArrayLiteral("charset=");
 	int idx = header.indexOf (charsetStr);
 	
 	QByteArray charset = QByteArrayLiteral("latin-1");
