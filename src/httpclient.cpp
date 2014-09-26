@@ -902,7 +902,7 @@ bool Nuria::HttpClient::hasReadablePostBody () const {
 	
 	// 
 	QByteArray contentType = this->d_ptr->requestHeaders.value (httpHeaderName (HeaderContentType));
-	if (contentTypeIsMultipart (contentType)) {
+	if (contentTypeIsMultipart (contentType) || contentTypeIsUrlEncoded (contentType)) {
 		return true;
 	}
 	
