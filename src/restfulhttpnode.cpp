@@ -159,11 +159,13 @@ QByteArray Nuria::RestfulHttpNode::generateResultData (QVariant result, Nuria::H
 		return result.toByteArray ();
 	case QMetaType::QString:
 		return result.toString ().toUtf8 ();
+	case QMetaType::QJsonDocument:
+		addJsonContentTypeHeaderToResponse (client);
+		return result.value< QJsonDocument > ().toJson (QJsonDocument::Compact);
 	case QMetaType::QVariantMap:
-	case QMetaType::QVariantList: {
+	case QMetaType::QVariantList:
 		addJsonContentTypeHeaderToResponse (client);
 		return QJsonDocument::fromVariant (result).toJson (QJsonDocument::Compact);
-	} break;
 	}
 	
 	// Try serializing the structure
