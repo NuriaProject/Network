@@ -180,14 +180,69 @@ QByteArray Nuria::HttpParser::correctHeaderKeyCase (QByteArray key) {
 	return key;
 }
 
-bool Nuria::HttpParser::parseCookies (const QByteArray &data, Nuria::HttpClient::Cookies &target) {
-	QList< QNetworkCookie > list = QNetworkCookie::parseCookies (data);
-	
-	for (const QNetworkCookie &cookie : list) {
-		target.insert (cookie.name (), cookie);
+static int readUnquotedCookieValue (QNetworkCookie &cookie, const QByteArray &data, int offset) {
+	int end = data.indexOf (';', offset);
+	if (end == -1) {
+		end = data.length ();
 	}
 	
-	return true;
+	// 
+	cookie.setValue (QByteArray::fromPercentEncoding (data.mid (offset, end - offset)));
+	return end + 1;
+}
+
+static int readQuotedCookieValue (QNetworkCookie &cookie, const QByteArray &data, int offset) {
+	int end = data.indexOf ("\"", offset + 1);
+	if (end == -1 || (end + 1 < data.length () && data.at (end + 1) != ';')) {
+		return -1;
+	}
+	
+	// 
+	offset++;
+	cookie.setValue (QByteArray::fromPercentEncoding (data.mid (offset, end - offset)));
+	return end + 2;
+	
+}
+
+static QNetworkCookie parseSingleCookie (const QByteArray &data, int &offset) {
+	QNetworkCookie cookie;
+	
+	// 
+	int equalSign = data.indexOf ('=', offset);
+	if (equalSign < 1) {
+		offset = -1;
+		return cookie;
+	}
+	
+	// 
+	QByteArray name = data.mid (offset, equalSign - offset).trimmed ();
+	cookie.setName (name);
+	
+	if (name.contains (';') || data.length () < equalSign + 1) {
+		offset = -1;
+	} else if (data.at (equalSign + 1) == '"') {
+		offset = readQuotedCookieValue (cookie, data, equalSign + 1);
+	} else {
+		offset = readUnquotedCookieValue (cookie, data, equalSign + 1);
+	}
+	
+	// 
+	return cookie;
+	
+}
+
+bool Nuria::HttpParser::parseCookies (const QByteArray &data, Nuria::HttpClient::Cookies &target) {
+	int offset = 0;
+	for (QNetworkCookie cookie; !(cookie = parseSingleCookie (data, offset)).name ().isEmpty () && offset != -1; ) {
+		target.insert (cookie.name (), cookie);
+		
+		// 
+		if (offset >= data.length ()) {
+			break;
+		}
+	}
+	
+	return (offset != -1);
 }
 
 bool Nuria::HttpParser::parseFirstLineFull (const QByteArray &line, Nuria::HttpClient::HttpVerb &verb,

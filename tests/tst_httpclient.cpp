@@ -119,6 +119,7 @@ private slots:
 	void bodyReaderForMultipart ();
 	void bodyReaderForMultipartNoBoundaryGiven ();
 	void bodyReaderForUrlEncoded ();
+	void parseCookiesFromHeader ();
 	
 private:
 	
@@ -406,6 +407,19 @@ void HttpClientTest::bodyReaderForUrlEncoded () {
 	
 	HttpClient *client = createClient (input);
 	QCOMPARE(node->readerClassName, QByteArray ("Nuria::HttpUrlEncodedReader"));
+}
+
+void HttpClientTest::parseCookiesFromHeader () {
+	QByteArray input = "GET / HTTP/1.0\r\n"
+	                   "Cookie: foo=bar; nuria=project\r\n\r\n";
+	
+	HttpClient *client = createClient (input);
+	HttpClient::Cookies cookies = client->cookies ();
+	
+	QCOMPARE(cookies.size (), 2);
+	QCOMPARE(cookies.value ("foo").value (), QByteArray ("bar"));
+	QCOMPARE(cookies.value ("nuria").value (), QByteArray ("project"));
+	
 }
 
 QTEST_MAIN(HttpClientTest)

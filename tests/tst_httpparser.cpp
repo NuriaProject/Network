@@ -49,6 +49,12 @@ private slots:
 	void parseFirstLineFullHappyPath ();
 	void parseFirstLineFullBadData_data ();
 	void parseFirstLineFullBadData ();
+	
+	void parseCookie_data ();
+	void parseCookie ();
+	
+	void parseCookieFails_data ();
+	void parseCookieFails ();
 };
 
 void HttpParserTest::removeTrailingNewline () {
@@ -273,6 +279,67 @@ void HttpParserTest::parseFirstLineFullBadData () {
 	HttpClient::HttpVersion version;
 	QVERIFY(!parser.parseFirstLineFull (lineData, verb, path, version));
 	
+}
+
+void HttpParserTest::parseCookie_data () {
+	QTest::addColumn< QString > ("data");
+	QTest::addColumn< QStringList > ("names");
+	QTest::addColumn< QStringList > ("values");
+	
+	QString withoutDquotes1 = "foo=bar";
+	QString withoutDquotes2 = "bar=baz";
+	QString withDquotes1 = "nuria=\"project;\"";
+	QString withDquotes2 = "some=\"thing;\"";
+	
+	QTest::newRow ("no-dquote") << withoutDquotes1 << QStringList { "foo" } << QStringList { "bar" };
+	QTest::newRow ("2x no-dquote") << withoutDquotes1 + ";" + withoutDquotes2 << QStringList { "foo", "bar" }
+	                               << QStringList { "bar", "baz" };
+	QTest::newRow ("dquote") << withDquotes1 << QStringList { "nuria" } << QStringList { "project;" };
+	QTest::newRow ("2x dquote") << withDquotes1 + ";" + withDquotes2 << QStringList { "nuria", "some" }
+	                            << QStringList { "project;", "thing;" };
+	QTest::newRow ("no-dquote dquote") << withoutDquotes1 + ";" + withDquotes1 << QStringList { "foo", "nuria" }
+	                                   << QStringList { "bar", "project;" };
+	QTest::newRow ("dquote no-dquote") << withDquotes1 + ";" + withoutDquotes1 << QStringList { "foo", "nuria" }
+	                                   << QStringList { "bar", "project;" };
+	QTest::newRow ("no-dquote encoded") << "foo=ba%20r" << QStringList { "foo" } << QStringList { "ba r" };
+	QTest::newRow ("dquote encoded") << "foo=\"ba%20r\"" << QStringList { "foo" } << QStringList { "ba r" };
+	
+}
+
+void HttpParserTest::parseCookie () {
+	QFETCH(QString, data);
+	QFETCH(QStringList, names);
+	QFETCH(QStringList, values);
+	
+	HttpParser parser;
+	HttpClient::Cookies map;
+	QVERIFY(parser.parseCookies (data.toLatin1 (), map));
+	QCOMPARE(map.size (), names.length ());
+	
+	for (int i = 0; i < names.length (); i++) {
+		QNetworkCookie cookie = map.value (names.at (i).toLatin1 ());
+		QCOMPARE(cookie.name (), names.at (i).toLatin1 ());
+		QCOMPARE(cookie.value (), values.at (i).toLatin1 ());
+	}
+	
+}
+
+void HttpParserTest::parseCookieFails_data () {
+	QTest::addColumn< QString > ("data");
+	
+	QTest::newRow ("no ending dquote") << "foo=\"bar";
+	QTest::newRow ("no ; after dquote") << "foo=\"bar\"nuria=project";
+	QTest::newRow ("no value end") << "foo=bar;nuria";
+	QTest::newRow ("no value front") << "foo;nuria=project";
+	
+}
+
+void HttpParserTest::parseCookieFails () {
+	QFETCH(QString, data);
+	
+	HttpParser parser;
+	HttpClient::Cookies map;
+	QVERIFY(!parser.parseCookies (data.toLatin1 (), map));
 }
 
 QTEST_MAIN(HttpParserTest)
