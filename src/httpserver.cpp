@@ -197,10 +197,11 @@ bool Nuria::HttpServer::invokeByPath (HttpClient *client, const QString &path) {
 	}
 	
 	// 
-	nLog() << "404 - File/Slot not found:" << path;
+	if (!client->responseHeaderSent ()) {
+		nLog() << "404 - File/Slot not found:" << path;
+		client->killConnection (404);
+	}
 	
-	// Whatever the user wanted, it isn't there.
-	client->killConnection (404);
 	return false;
 	
 }

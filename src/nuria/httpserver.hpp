@@ -117,10 +117,6 @@ public:
 	 */
 	void setFqdn (const QString &fqdn);
 	
-signals:
-	
-public slots:
-	
 private slots:
 	
 	void newClient ();
