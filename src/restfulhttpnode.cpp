@@ -17,11 +17,12 @@
 
 #include "nuria/restfulhttpnode.hpp"
 
-#include <QRegularExpression>
 #include <nuria/serializer.hpp>
-#include <QJsonDocument>
 #include <nuria/callback.hpp>
+#include <QRegularExpression>
 #include <nuria/debug.hpp>
+#include <QJsonDocument>
+#include <QDateTime>
 
 enum { NumberOfHandlers = 5 };
 
@@ -108,27 +109,37 @@ void Nuria::RestfulHttpNode::setRestfulHandler (const QString &path, const QStri
 	setRestfulHandler (HttpClient::AllVerbs, path, argumentNames, callback, waitForRequestPostBody);
 }
 
-QByteArray Nuria::RestfulHttpNode::convertVariantToData (const QVariant &variant) {
+QVariant Nuria::RestfulHttpNode::serializeVariant (const QVariant &variant) {
+	int type = variant.userType ();
 	
-	// Static mappings
-	switch (variant.userType ()) {
-	case QMetaType::QString:
-		return variant.toString ().toUtf8 ();
+	// Qt Types
+	switch (type) {
 	case QMetaType::QByteArray:
-		return variant.toByteArray ();
+	case QMetaType::QString:
+	        return variant;
+	case QMetaType::QDateTime:
+		return variant.toDateTime ().toString (Qt::ISODate);
+	case QMetaType::QDate:
+		return variant.toDate ().toString (Qt::ISODate);
+	case QMetaType::QTime:
+		return variant.toTime ().toString (Qt::ISODate);
 	}
 	
-	// 
-	QVariant tryToString = variant;
-	if (tryToString.convert (QMetaType::QString)) {
-		return tryToString.toString ().toUtf8 ();
+	// POD types
+	if ((type >= QMetaType::Bool && type <= QMetaType::ULongLong) ||
+	    (type >= QMetaType::Long && type <= QMetaType::Float)) {
+		return variant;
 	}
 	
-	// 
-	QVariant tryToByteArray = variant;
-	tryToByteArray.convert (QMetaType::QByteArray);
-	return tryToByteArray.toByteArray ();
+	// Lists and maps
+	if (variant.canConvert< QVariantList > ()) {
+		return deepConvertList (variant.toList ());
+	} else if (variant.canConvert< QVariantMap > ()) {
+		return deepConvertMap (variant.toMap ());
+	}
 	
+	// Custom structures
+	return serializeUserStructure (variant);
 }
 
 QVariant Nuria::RestfulHttpNode::convertArgumentToVariant (const QString &argumentData, int targetType) {
@@ -150,10 +161,7 @@ void Nuria::RestfulHttpNode::conversionFailure (const QVariant &variant, Nuria::
 	client->killConnection (500);
 }
 
-QByteArray Nuria::RestfulHttpNode::generateResultData (QVariant result, Nuria::HttpClient *client) {
-	Q_UNUSED(client);
-	
-	// 
+QByteArray Nuria::RestfulHttpNode::generateResultData (const QVariant &result, Nuria::HttpClient *client) {
 	switch (result.userType ()) {
 	case QMetaType::QByteArray:
 		return result.toByteArray ();
@@ -162,27 +170,11 @@ QByteArray Nuria::RestfulHttpNode::generateResultData (QVariant result, Nuria::H
 	case QMetaType::QJsonDocument:
 		addJsonContentTypeHeaderToResponse (client);
 		return result.value< QJsonDocument > ().toJson (QJsonDocument::Compact);
-	case QMetaType::QVariantMap:
-	case QMetaType::QVariantList:
-		addJsonContentTypeHeaderToResponse (client);
-		return QJsonDocument::fromVariant (result).toJson (QJsonDocument::Compact);
 	}
-	
-	// Try serializing the structure
-	Serializer serializer;
-	void *objectPtr = const_cast< void * > (result.constData ());
-	QVariantMap serialized = serializer.serialize (objectPtr, result.typeName ()); 
 	
 	// 
-	if (!serializer.failedFields ().isEmpty ()) {
-		return QByteArray ();
-	}
-	
-	// Serialize map to JSON.
-	addJsonContentTypeHeaderToResponse (client);
-	return QJsonDocument::fromVariant (serialized).toJson (QJsonDocument::Compact);
+	return sendVariantAsJson (serializeVariant (result), client);
 }
-
 
 #ifndef Q_OS_UNIX
 #if defined(Q_CC_MINGW) || defined (Q_CC_GNU)
@@ -206,6 +198,7 @@ bool Nuria::RestfulHttpNode::invokePath (const QString &path, const QStringList 
 	// 
 	if (client->verb () == HttpClient::InvalidVerb ||
 	    !allowAccessToClient (path, parts, index, client)) {
+		client->killConnection (403);
 		return false;
 	}
 	
@@ -449,6 +442,47 @@ void Nuria::RestfulHttpNode::addJsonContentTypeHeaderToResponse (HttpClient *cli
 		client->setResponseHeader (HttpClient::HeaderContentType, json);
 	}
 	
+}
+
+QVariantMap Nuria::RestfulHttpNode::deepConvertMap (QVariantMap map) {
+	for (auto it = map.begin (), end = map.end (); it != end; ++it) {
+		*it = serializeVariant (*it);
+	}
+	
+	return map;
+}
+
+QVariantList Nuria::RestfulHttpNode::deepConvertList (QVariantList list) {
+	for (auto it = list.begin (), end = list.end (); it != end; ++it) {
+		*it = serializeVariant (*it);
+	}
+	
+	return list;
+	
+}
+
+QVariant Nuria::RestfulHttpNode::serializeUserStructure (const QVariant &variant) {
+	Serializer serializer;
+	void *objectPtr = const_cast< void * > (variant.constData ());
+	QVariantMap serialized = serializer.serialize (objectPtr, variant.typeName ()); 
+	
+	// 
+	if (!serializer.failedFields ().isEmpty ()) {
+		return QVariant ();
+	}
+	
+	return serialized;
+	
+}
+
+QByteArray Nuria::RestfulHttpNode::sendVariantAsJson (const QVariant &variant, Nuria::HttpClient *client) {
+	if (!variant.isValid ()) {
+		return QByteArray ();
+	}
+	
+	// Add JSON Content-Type and return serialized JSON data.
+	addJsonContentTypeHeaderToResponse (client);
+	return QJsonDocument::fromVariant (variant).toJson (QJsonDocument::Compact);
 }
 
 void Nuria::RestfulHttpNode::registerMetaMethod (MetaMethod &method) {

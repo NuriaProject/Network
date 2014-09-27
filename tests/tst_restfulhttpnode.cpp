@@ -58,6 +58,14 @@ private:
 		return qobject_cast< HttpMemoryTransport * > (client->transport ());
 	}
 	
+	void reopenTransport () {
+		transport->blockSignals (true);
+		transport->clearOutgoing ();
+		transport->open (QIODevice::ReadWrite);
+		client->open (QIODevice::ReadWrite);
+		transport->blockSignals (false);
+	}
+	
 	HttpMemoryTransport *transport = new HttpMemoryTransport;
 	HttpServer *server = new HttpServer (this);
 	HttpClient *client = new HttpClient (transport, server);
@@ -70,12 +78,7 @@ void RestfulHttpNodeTest::initTestCase () {
 	
 	transport->setIncoming ("GET / HTTP/1.0\r\n\r\n");
 	qApp->processEvents ();
-	
-	transport->blockSignals (true);
-	transport->clearOutgoing ();
-	transport->open (QIODevice::ReadWrite);
-	client->open (QIODevice::ReadWrite);
-	transport->blockSignals (false);
+	reopenTransport ();
 	
 }
 
@@ -101,19 +104,21 @@ void RestfulHttpNodeTest::registeringAHandler () {
 }
 
 void RestfulHttpNodeTest::returnFalseWhenPathNotFound () {
+	reopenTransport ();
 	QVERIFY(!node->invokeTest ("does/not/exist", client));
 }
 
 void RestfulHttpNodeTest::allowAccessToClientsIsCalled () {
 	QTest::ignoreMessage (QtDebugMsg, "Access denied");
+	reopenTransport ();
 	QVERIFY(!node->invokeTest ("foo/deny", client));
 }
 
 void RestfulHttpNodeTest::invokeAnnotatedHandler () {
 	client->setProperty ("someProperty", "abc");
 	QTest::ignoreMessage (QtDebugMsg, "foo 123 1 abc");
-	transport->clearOutgoing ();
 	
+	reopenTransport ();
 	QVERIFY(node->invokeTest ("annotate/123/true/foo", client));
 	QByteArray outData = transport->outData ();
 	outData.replace (' ', ""); // Remove spaces to be consistent across Qt versions.

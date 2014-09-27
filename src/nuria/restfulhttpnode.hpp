@@ -159,14 +159,23 @@ public:
 protected:
 	
 	/**
-	 * Takes \a variant and tries to convert it to a \c QByteArray.
+	 * Takes \a variant and tries to convert it to a \c QVariant only
+	 * consisting out of POD- and some Qt types.
+	 * 
+	 * Allowed types:
+	 *  - QVariantMap, QVariantList (And everything convertable to those)
+	 *  - QString, QByteArray, QDateTime, QTime, QDate
+	 *  - bool, int, long long, etc. (Except for pointer types)
+	 * 
 	 * When re-implementing this method call the default implementation if
 	 * you don't handle this type:
-	 * \codeline return HttpNode::convertVariantToData (variant);
+	 * \code
+	 * return HttpNode::convertVariantToData (variant);
+	 * \endcode
 	 * 
-	 * If a empty QByteArray is returned the conversion has failed.
+	 * If the result is invalid the conversion failed.
 	 */
-	virtual QByteArray convertVariantToData (const QVariant &variant);
+	virtual QVariant serializeVariant (const QVariant &variant);
 	
 	/**
 	 * Takes \a argumentData and returns a QVariant of type \a targetType.
@@ -185,9 +194,13 @@ protected:
 	
 	/**
 	 * Converts \a result to a QByteArray. A empty QByteArray is treated as
-	 * error.
+	 * error. Also responsible for setting response headers specific to the
+	 * format, e.g. Content-Type for JSON.
+	 * 
+	 * \note Override serializeVariant() instead for easier use if you want
+	 * to change how a specific type in a QVariant is converted.
 	 */
-	QByteArray generateResultData (QVariant result, HttpClient *client);
+	virtual QByteArray generateResultData (const QVariant &result, HttpClient *client);
 	
 	/** \reimp Does the invocation. */
 	bool invokePath (const QString &path, const QStringList &parts,
@@ -210,6 +223,10 @@ private:
 				     QRegularExpressionMatch &match, HttpClient *client);
 	bool writeResponse (const QVariant &response, HttpClient *client);
 	void addJsonContentTypeHeaderToResponse (HttpClient *client);
+	QVariantMap deepConvertMap (QVariantMap map);
+	QVariantList deepConvertList (QVariantList list);
+	QVariant serializeUserStructure (const QVariant &variant);
+	QByteArray sendVariantAsJson (const QVariant &variant, HttpClient *client);
 	
 	RestfulHttpNodePrivate *d_ptr;
 	
