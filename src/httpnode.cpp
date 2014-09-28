@@ -16,7 +16,7 @@
  */
 
 #include "nuria/httpnode.hpp"
-#include <QMetaMethod>
+#include <QMimeDatabase>
 #include <QDir>
 
 #include "private/httpprivate.hpp"
@@ -381,6 +381,18 @@ bool Nuria::HttpNode::sendStaticResource (const QString &name, Nuria::HttpClient
 	return sendStaticResource (name.split (QLatin1Char ('/')), 0, client);
 }
 
+static void setMimeTypeHeaderForStaticResource (Nuria::HttpClient *client, const QString &name, QIODevice *device) {
+	if (client->hasResponseHeader (Nuria::HttpClient::HeaderContentType)) {
+		return;
+	}
+	
+	// Set Content-Type
+	QMimeDatabase database;
+	QMimeType mimeType = database.mimeTypeForFileNameAndData (name, device);
+	client->setResponseHeader (Nuria::HttpClient::HeaderContentType, mimeType.name ().toLatin1 ());
+	
+}
+
 bool Nuria::HttpNode::sendStaticResource (const QStringList &path, int indexInPath, HttpClient *client) {
 	qint64 maxLen = -1; // For range requests
 	
@@ -426,6 +438,9 @@ bool Nuria::HttpNode::sendStaticResource (const QStringList &path, int indexInPa
 		delete handle;
 		return false;
 	}
+	
+	// Determine mime type
+	setMimeTypeHeaderForStaticResource (client, file, handle);
 	
 	// Is the client only interested in a specific range?
 	if (client->rangeStart () != -1) {
