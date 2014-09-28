@@ -288,7 +288,7 @@ bool Nuria::HttpNode::invokePath (const QString &path, const QStringList &parts,
 	}
 	
 	// 
-	static const QString indexSlot (QLatin1String ("index"));
+	static const QString indexSlot = QStringLiteral("index");
 	
 	// Client requested page index.
 	if (parts.isEmpty () || index >= parts.length ()) {
@@ -405,11 +405,11 @@ bool Nuria::HttpNode::sendStaticResource (const QStringList &path, int indexInPa
 	QString file;
 	
 	if (path.isEmpty ()) {
-		file = QLatin1String ("index.html");
+		file = QStringLiteral("index.html");
 	} else {
 		
 		// Make sure there are no '..' or '.' elements in path.
-		if (path.contains (QLatin1String ("..")) || path.contains (QLatin1String ("."))) {
+		if (path.contains (QStringLiteral("..")) || path.contains (QStringLiteral("."))) {
 			return false;
 		}
 		
@@ -422,10 +422,10 @@ bool Nuria::HttpNode::sendStaticResource (const QStringList &path, int indexInPa
 		
 		// Construct path
 		if (indexInPath == 0) {
-			file = path.join (QLatin1String ("/"));
+			file = path.join (QLatin1Char ('/'));
 		} else {
 			QStringList part = path.mid (indexInPath);
-			file = part.join (QLatin1String ("/"));
+			file = part.join (QLatin1Char ('/'));
 		}
 		
 	}
