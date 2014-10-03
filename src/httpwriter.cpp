@@ -202,3 +202,43 @@ void Nuria::HttpWriter::applyRangeHeaders (qint64 begin, qint64 end, qint64 tota
 	}
 	
 }
+
+void Nuria::HttpWriter::addTransferEncodingHeader (HttpClient::TransferMode mode, HttpClient::HeaderMap &headers) {
+	QByteArray transEncodingHeader = HttpClient::httpHeaderName (HttpClient::HeaderTransferEncoding);
+	static const QByteArray chunked = QByteArrayLiteral("chunked");
+	
+	if (mode != HttpClient::ChunkedStreaming) {
+		return;
+	}
+	
+	// 
+	QByteArray headerValue = headers.value (transEncodingHeader);
+	if (headerValue.isEmpty ()) {
+		headerValue = chunked;
+	} else if (!headerValue.contains (chunked)) {
+		headerValue.append (", chunked");
+	}
+	
+	// Store
+	headers.insert (transEncodingHeader, headerValue);
+	
+}
+
+void Nuria::HttpWriter::addConnectionHeader (HttpClient::ConnectionMode mode, int count, int max,
+                                             HttpClient::HeaderMap &headers) {
+	QByteArray connectionHeader = HttpClient::httpHeaderName (HttpClient::HeaderConnection);
+	static const QByteArray close = QByteArrayLiteral("close");
+	static const QByteArray keepAlive = QByteArrayLiteral("keep-alive");
+	
+	if (count < max || max == -1) {
+		if (mode == HttpClient::ConnectionKeepAlive) {
+			headers.insert (connectionHeader, keepAlive);
+		} else {
+			headers.insert (connectionHeader, close);
+		}
+		
+	} else {
+		headers.insert (connectionHeader, close);
+	}
+	
+}

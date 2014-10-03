@@ -24,10 +24,13 @@
 
 namespace Nuria {
 
+class TemporaryBufferDevice;
+
 // Private data structure of Nuria::HttpClient
 struct HttpClientPrivate {
 	
 	// 
+	TemporaryBufferDevice *outBuffer = nullptr;
 	HttpTransport *transport;
 	HttpServer *server;
 	
@@ -42,6 +45,8 @@ struct HttpClientPrivate {
 	HttpClient::HeaderMap responseHeaders;
 	HttpClient::Cookies requestCookies;
 	HttpClient::Cookies responseCookies;
+	HttpClient::TransferMode transferMode = HttpClient::Streaming;
+	HttpClient::ConnectionMode connectionMode = HttpClient::ConnectionClose;
 	
 	QUrl path;
 	
@@ -52,7 +57,6 @@ struct HttpClientPrivate {
 	HttpPostBodyReader *bodyReader = nullptr;
 	qint64 postBodyLength = -1;
 	qint64 postBodyTransferred = 0;
-	bool chunkedBodyTransfer = false; // For 100-continue stuff
 	
 	qint64 rangeStart = -1;
 	qint64 rangeEnd = -1;

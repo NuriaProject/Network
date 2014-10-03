@@ -68,6 +68,13 @@ public:
 	HttpClient::HttpVerb parseVerb (const QByteArray &verb);
 	
 	/**
+	 * Returns the appropriate HttpClient::TransferMode for
+	 * \a connectionHeader. Defaults to HttpClient::Streaming.
+	 */
+	HttpClient::TransferMode decideTransferMode (HttpClient::HttpVersion version,
+	                                             const QByteArray &connectionHeader);
+	
+	/**
 	 * Parses \a value which contains the value of a "Range" HTTP header.
 	 * On success, it sets \a begin and \a end to the given values and
 	 * returns \c true.

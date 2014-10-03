@@ -29,45 +29,26 @@ namespace Nuria {
 class HttpMemoryTransport : public HttpTransport {
 	Q_OBJECT
 public:
-	QBuffer *ingoing; // Transport -> HttpClient
-	QBuffer *outgoing; // HttpClient -> Transport
+	QByteArray outData;
 	
 	/** Constructor. */
 	explicit HttpMemoryTransport (QObject *parent = 0);
 	
-	const QByteArray &inData ()
-	{ return ingoing->data (); }
-	
-	const QByteArray &outData ()
-	{ return outgoing->data (); }
-	
-	void clearOutgoing () {
-		outgoing->close ();
-		outgoing->setData (QByteArray ());
-		outgoing->open (QIODevice::ReadWrite);
+	QByteArray process (HttpClient *client, QByteArray data) {
+		readFromRemote (client, data);
+		setCurrentRequestCount (currentRequestCount () + 1);
+		return data;
 	}
 	
-	void setIncoming (const QByteArray &data) {
-		ingoing->close ();
-		ingoing->setData (data);
-		ingoing->open (QIODevice::ReadOnly);
-		emit readyRead ();
-	}
+	// 
+	bool isOpen () const;
 	
-	void close ();
-	qint64 pos () const;
-	qint64 size () const;
-	bool seek (qint64 pos);
-	bool atEnd () const;
-	qint64 bytesAvailable () const;
-	bool reset ();
-	bool canReadLine () const;
+public slots:
+	void forceClose ();
 	
 protected:
-	qint64 readData (char *data, qint64 maxlen);
-	qint64 readLineData(char *data, qint64 maxlen);
-	qint64 writeData (const char *data, qint64 len);
-	
+	void close (HttpClient *client);
+	bool sendToRemote (HttpClient *client, const QByteArray &data);
 };
 
 }

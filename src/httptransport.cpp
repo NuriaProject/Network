@@ -16,15 +16,30 @@
  */
 
 #include "nuria/httptransport.hpp"
+#include "nuria/httpclient.hpp"
+
+namespace Nuria {
+class HttpTransportPrivate {
+public:
+	
+	int requestCount = 0;
+	int maxRequests = HttpTransport::MaxRequestsDefault;
+	
+	int timeoutConnect = HttpTransport::DefaultConnectTimeout;
+	int timeoutData = HttpTransport::DefaultDataTimeout;
+	int timeoutKeepAlive = HttpTransport::DefaultKeepAliveTimeout;
+	
+};
+}
 
 Nuria::HttpTransport::HttpTransport (QObject *parent)
-	: QIODevice (parent)
+	: QObject (parent), d_ptr (new HttpTransportPrivate)
 {
 	
 }
 
 Nuria::HttpTransport::~HttpTransport () {
-	
+	delete this->d_ptr;
 }
 
 Nuria::HttpTransport::Type Nuria::HttpTransport::type () const {
@@ -51,10 +66,57 @@ quint16 Nuria::HttpTransport::peerPort () const {
 	return 0;
 }
 
-bool Nuria::HttpTransport::flush () {
+int Nuria::HttpTransport::currentRequestCount () const {
+	return this->d_ptr->requestCount;
+}
+
+int Nuria::HttpTransport::maxRequests () const {
+	return this->d_ptr->maxRequests;
+}
+
+void Nuria::HttpTransport::setMaxRequests (int count) {
+	this->d_ptr->maxRequests = count;
+}
+
+int Nuria::HttpTransport::timeout (HttpTransport::Timeout which) {
+	switch (which) {
+	case ConnectTimeout: return this->d_ptr->timeoutConnect;
+	case DataTimeout: return this->d_ptr->timeoutData;
+	case KeepAliveTimeout: return this->d_ptr->timeoutKeepAlive;
+	}
+	
+	return 0;
+}
+
+void Nuria::HttpTransport::setTimeout (HttpTransport::Timeout which, int msec) {
+	switch (which) {
+	case ConnectTimeout:
+		this->d_ptr->timeoutConnect = msec;
+		break;
+	case DataTimeout:
+		this->d_ptr->timeoutData = msec;
+		break;
+	case KeepAliveTimeout:
+		this->d_ptr->timeoutKeepAlive = msec;
+		break;
+	}
+	
+	emit timeoutChanged (which, msec);
+}
+
+bool Nuria::HttpTransport::flush (HttpClient *client) {
+	Q_UNUSED(client)
 	return true;
 }
 
-void Nuria::HttpTransport::forceClose () {
-	close ();
+void Nuria::HttpTransport::setCurrentRequestCount (int count) {
+	this->d_ptr->requestCount = count;
+}
+
+void Nuria::HttpTransport::readFromRemote (HttpClient *client, QByteArray &data) {
+	client->processData (data);
+}
+
+void Nuria::HttpTransport::bytesSent (HttpClient *client, qint64 bytes) {
+	client->bytesSent (bytes);
 }

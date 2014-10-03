@@ -136,6 +136,22 @@ Nuria::HttpClient::HttpVerb Nuria::HttpParser::parseVerb (const QByteArray &verb
 	return HttpClient::InvalidVerb;
 }
 
+Nuria::HttpClient::TransferMode Nuria::HttpParser::decideTransferMode (HttpClient::HttpVersion version,
+                                                                       const QByteArray &connectionHeader) {
+	HttpClient::TransferMode default10 = HttpClient::Streaming;
+	HttpClient::TransferMode default11 = HttpClient::ChunkedStreaming;
+	
+	if (!qstricmp (connectionHeader.constData (), "close")) {
+		return HttpClient::Streaming;
+	}
+	
+	if (!qstricmp (connectionHeader.constData (), "keep-alive")) {
+		return HttpClient::ChunkedStreaming;
+	}
+	
+	return (version == HttpClient::Http1_0) ? default10 : default11;
+}
+
 bool Nuria::HttpParser::parseRangeHeaderValue (const QByteArray &value, qint64 &begin, qint64 &end) {
 	// Format: "bytes=<Begin>-<End>"
 	

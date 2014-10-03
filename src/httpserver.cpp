@@ -60,7 +60,7 @@ Nuria::HttpServer::HttpServer (bool supportSsl, QObject *parent)
 	this->d_ptr->server = new QTcpServer (this);
 	
 	this->d_ptr->root = new HttpNode (this);
-	this->d_ptr->root->setResourceName (QLatin1String ("ROOT"));
+	this->d_ptr->root->setResourceName (QStringLiteral("ROOT"));
 	
 	// Connect to m_server's newConnection() signal
 	connect (this->d_ptr->server, SIGNAL(newConnection()), SLOT(newClient()));
@@ -179,8 +179,9 @@ void Nuria::HttpServer::newClient () {
 		
 		QTcpSocket *socket = server->nextPendingConnection ();
 		HttpTcpTransport *transport = new HttpTcpTransport (socket, this);
-		HttpClient *client = new HttpClient (transport, this);
-		Q_UNUSED(client)
+		Q_UNUSED(transport)
+//		HttpClient *client = new HttpClient (transport, this);
+//		Q_UNUSED(client)
 		
 	}
 	

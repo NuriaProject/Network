@@ -48,6 +48,14 @@ private slots:
 	void applyRangeHeadersLength ();
 	void applyRangeHeadersLengthLeftAlone ();
 	void applyRangeHeadersNothing ();
+	
+	void addTransferEncodingHeaderSetsChunked ();
+	void addTransferEncodingHeaderAddsChunked ();
+	void addTransferEncodingHeaderDoesNothing ();
+	void addTransferEncodingHeaderContainsChunkedAlready ();
+	
+	void addConnectionHeader_data ();
+	void addConnectionHeader ();
 };
 
 void HttpWriterTest::httpVersionToString () {
@@ -257,6 +265,67 @@ void HttpWriterTest::applyRangeHeadersNothing () {
 	writer.applyRangeHeaders (-1, -1, -1, map);
 	QVERIFY(!map.contains ("Content-Range"));
 	QVERIFY(!map.contains ("Content-Length"));
+}
+
+void HttpWriterTest::addTransferEncodingHeaderSetsChunked () {
+	HttpWriter writer;
+	HttpClient::HeaderMap map;
+	
+	writer.addTransferEncodingHeader (HttpClient::ChunkedStreaming, map);
+	QCOMPARE(map.value ("Transfer-Encoding"), QByteArray ("chunked"));
+	
+}
+
+void HttpWriterTest::addTransferEncodingHeaderAddsChunked () {
+	HttpWriter writer;
+	HttpClient::HeaderMap map = { { "Transfer-Encoding", "gzip" } };
+	
+	writer.addTransferEncodingHeader (HttpClient::ChunkedStreaming, map);
+	QCOMPARE(map.value ("Transfer-Encoding"), QByteArray ("gzip, chunked"));
+}
+
+void HttpWriterTest::addTransferEncodingHeaderDoesNothing () {
+	HttpWriter writer;
+	HttpClient::HeaderMap map;
+	
+	writer.addTransferEncodingHeader (HttpClient::Buffered, map);
+	writer.addTransferEncodingHeader (HttpClient::Streaming, map);
+	QVERIFY(map.isEmpty ());
+}
+
+void HttpWriterTest::addTransferEncodingHeaderContainsChunkedAlready () {
+	HttpWriter writer;
+	HttpClient::HeaderMap map = { { "Transfer-Encoding", "chunked, gzip" } };
+	
+	writer.addTransferEncodingHeader (HttpClient::ChunkedStreaming, map);
+	QCOMPARE(map.value ("Transfer-Encoding"), QByteArray ("chunked, gzip"));
+}
+
+void HttpWriterTest::addConnectionHeader_data () {
+	QTest::addColumn< int > ("mode");
+	QTest::addColumn< int > ("current");
+	QTest::addColumn< int > ("max");
+	QTest::addColumn< QString > ("result");
+	
+	QTest::newRow ("not last request") << 1 << 1 << 2 << "keep-alive";
+	QTest::newRow ("unlimited requests") << 1 << 2 << -1 << "keep-alive";
+	QTest::newRow ("last request") << 1 << 2 << 2 << "close";
+	QTest::newRow ("close") << 0 << 2 << 2 << "close";
+	
+}
+
+void HttpWriterTest::addConnectionHeader () {
+	QFETCH(int, mode);
+	QFETCH(int, current);
+	QFETCH(int, max);
+	QFETCH(QString, result);
+	
+	HttpWriter writer;
+	HttpClient::HeaderMap map;
+	
+	writer.addConnectionHeader (HttpClient::ConnectionMode (mode), current, max, map);
+	QCOMPARE(map.value ("Connection"), result.toLatin1 ());
+	
 }
 
 QTEST_MAIN(HttpWriterTest)

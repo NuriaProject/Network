@@ -16,6 +16,9 @@
  */
 
 #include "nuria/httptcptransport.hpp"
+#include "nuria/httpclient.hpp"
+#include "nuria/httpserver.hpp"
+#include <nuria/debug.hpp>
 
 #include <QSslSocket>
 #include <QTcpSocket>
@@ -26,46 +29,40 @@ public:
 	
 	QTcpSocket *socket;
 	QSslSocket *sslSocket;
+	HttpClient *curClient = nullptr;
+	HttpServer *server;
+	int timeoutTimer = -1;
+	int bytesReceived = 0;
 	
 };
 }
 
-Nuria::HttpTcpTransport::HttpTcpTransport (QTcpSocket *socket, QObject *parent)
-	: HttpTransport (parent), d_ptr (new HttpTcpTransportPrivate)
+Nuria::HttpTcpTransport::HttpTcpTransport (QTcpSocket *socket, HttpServer *server)
+	: HttpTransport (server), d_ptr (new HttpTcpTransportPrivate)
 {
-	
+	this->d_ptr->server = server;
 	this->d_ptr->socket = socket;
 	this->d_ptr->sslSocket = qobject_cast< QSslSocket * > (socket);
-	setOpenMode (ReadWrite);
 	
-	// Forward signals
-	connect (this->d_ptr->socket, SIGNAL(disconnected()), SIGNAL(aboutToClose()));
-	connect (this->d_ptr->socket, SIGNAL(readyRead()), SIGNAL(readyRead()));
+	// Connect to signals
+	connect (this->d_ptr->socket, &QTcpSocket::disconnected, this, &HttpTcpTransport::clientDisconnected);
+	connect (this->d_ptr->socket, &QIODevice::readyRead, this, &HttpTcpTransport::dataReceived);
 	
 	if (this->d_ptr->sslSocket) {
-		connect (this->d_ptr->sslSocket, SIGNAL(encryptedBytesWritten(qint64)),
-			 SIGNAL(bytesWritten(qint64)));
+		connect (this->d_ptr->sslSocket, &QSslSocket::encryptedBytesWritten,
+			 this, &HttpTcpTransport::bytesWritten);
 	} else {
-		connect (this->d_ptr->socket, SIGNAL(bytesWritten(qint64)),
-			 SIGNAL(bytesWritten(qint64)));
+		connect (this->d_ptr->socket, &QTcpSocket::bytesWritten,
+			 this, &HttpTcpTransport::bytesWritten);
 	}
+	
+	// 
+	startTimeout (ConnectTimeout);
 	
 }
 
 Nuria::HttpTcpTransport::~HttpTcpTransport () {
 	delete this->d_ptr;
-}
-
-qint64 Nuria::HttpTcpTransport::readData (char *data, qint64 maxlen) {
-	return this->d_ptr->socket->read (data, maxlen);
-}
-
-qint64 Nuria::HttpTcpTransport::readLineData (char *data, qint64 maxlen) {
-	return this->d_ptr->socket->readLine (data, maxlen);
-}
-
-qint64 Nuria::HttpTcpTransport::writeData (const char *data, qint64 len) {
-	return this->d_ptr->socket->write (data, len);
 }
 
 Nuria::HttpTransport::Type Nuria::HttpTcpTransport::type () const {
@@ -92,85 +89,127 @@ quint16 Nuria::HttpTcpTransport::peerPort () const {
 	return this->d_ptr->socket->peerPort ();
 }
 
-bool Nuria::HttpTcpTransport::flush () {
+bool Nuria::HttpTcpTransport::isOpen () const {
+	return this->d_ptr->socket->isOpen ();
+}
+
+bool Nuria::HttpTcpTransport::flush (HttpClient *client) {
 	return this->d_ptr->socket->flush ();
 }
 
-bool Nuria::HttpTcpTransport::isSequential () const {
-	return this->d_ptr->socket->isSequential ();
-}
-
-bool Nuria::HttpTcpTransport::open (QIODevice::OpenMode mode) {
-	return this->d_ptr->socket->open (mode);
-}
-
-void Nuria::HttpTcpTransport::close () {
-	setOpenMode (NotOpen);
-	
-	if (closeSocketWhenBytesWereWritten ()) {
+void Nuria::HttpTcpTransport::close (HttpClient *client) {
+	if (client != this->d_ptr->curClient) {
 		return;
 	}
 	
-	// Wait for socket to completely send write buffer.
-	if (this->d_ptr->sslSocket) {
-		connect (this->d_ptr->sslSocket, SIGNAL(encryptedBytesWritten(qint64)),
-			 SLOT(closeSocketWhenBytesWereWritten()));
+	// Throw the client away
+	HttpClient::ConnectionMode mode = HttpClient::ConnectionClose;
+	if (this->d_ptr->curClient) {
+		mode = this->d_ptr->curClient->connectionMode ();
+		this->d_ptr->curClient->deleteLater ();
+		this->d_ptr->curClient = nullptr;
+	}
+	
+	// 'Streaming' doesn't support keep-alive connections, so we're done here.
+	if (mode == HttpClient::ConnectionClose || wasLastRequest ()) {
+		closeInternal ();
 	} else {
-		connect (this->d_ptr->socket, SIGNAL(bytesWritten(qint64)),
-			 SLOT(closeSocketWhenBytesWereWritten()));
+		startTimeout (KeepAliveTimeout);
 	}
 	
 }
 
-qint64 Nuria::HttpTcpTransport::pos () const {
-	return this->d_ptr->socket->pos ();
+bool Nuria::HttpTcpTransport::sendToRemote (HttpClient *client, const QByteArray &data) {
+	if (client != this->d_ptr->curClient || !this->d_ptr->socket->isOpen ()) {
+		return false;
+	}
+	
+	// 
+	return (this->d_ptr->socket->write (data) == data.length ());
 }
 
-qint64 Nuria::HttpTcpTransport::size () const {
-	return this->d_ptr->socket->size ();
+void Nuria::HttpTcpTransport::timerEvent (QTimerEvent *) {
+#ifdef QT_DEBUG
+	nDebug() << "Connection to" << this->d_ptr->socket->peerAddress () << "timed out - Closing.";
+#endif
+	
+	// 
+	forceClose ();
+	
 }
 
-bool Nuria::HttpTcpTransport::seek (qint64 pos) {
-	Q_UNUSED(pos);
-	return false;
+void Nuria::HttpTcpTransport::clientDestroyed (QObject *object) {
+	if (object != this->d_ptr->curClient) {
+		return;
+	}
+	
+	// 
+	close (this->d_ptr->curClient);
+	
 }
 
-bool Nuria::HttpTcpTransport::atEnd () const {
-	return this->d_ptr->socket->atEnd ();
+void Nuria::HttpTcpTransport::bytesWritten (qint64 bytes) {
+	if (this->d_ptr->curClient) {
+		bytesSent (this->d_ptr->curClient, bytes);
+	}
+	
 }
 
-bool Nuria::HttpTcpTransport::reset () {
-	return this->d_ptr->socket->reset ();
+void Nuria::HttpTcpTransport::processData (QByteArray &data) {
+	if (this->d_ptr->curClient->requestCompletelyReceived ()) {
+		return;
+	}
+	
+	// Process ...
+	readFromRemote (this->d_ptr->curClient, data);
+	
+	// 
+	if (this->d_ptr->curClient && this->d_ptr->curClient->requestCompletelyReceived ()) {
+		killTimeout ();
+	}
+	
 }
 
-qint64 Nuria::HttpTcpTransport::bytesAvailable () const {
-	return this->d_ptr->socket->bytesAvailable ();
+void Nuria::HttpTcpTransport::dataReceived () {
+	QByteArray data = this->d_ptr->socket->readAll ();
+	
+	while (!data.isEmpty () && this->d_ptr->socket->isOpen ()) {
+		if (this->d_ptr->curClient && !this->d_ptr->curClient->isOpen ()) {
+			close (this->d_ptr->curClient);
+		}
+		
+		// 
+		if (!this->d_ptr->curClient) {
+			startTimeout (DataTimeout);
+			setCurrentRequestCount (currentRequestCount () + 1);
+			this->d_ptr->curClient = new HttpClient (this, this->d_ptr->server);
+		}
+		
+		// 
+		processData (data);
+		
+	}
+	
 }
 
-qint64 Nuria::HttpTcpTransport::bytesToWrite () const {
-	return this->d_ptr->socket->bytesToWrite ();
-}
-
-bool Nuria::HttpTcpTransport::canReadLine () const {
-	return this->d_ptr->socket->canReadLine () || QIODevice::canReadLine ();
-}
-
-bool Nuria::HttpTcpTransport::waitForReadyRead (int msecs) {
-	return this->d_ptr->socket->waitForReadyRead (msecs);
-}
-
-bool Nuria::HttpTcpTransport::waitForBytesWritten (int msecs) {
-	return this->d_ptr->socket->waitForBytesWritten (msecs);
+void Nuria::HttpTcpTransport::clientDisconnected () {
+	if (this->d_ptr->curClient) {
+		this->d_ptr->curClient->close ();
+		this->d_ptr->curClient->deleteLater ();
+		this->d_ptr->curClient = nullptr;
+	}
+	
+	// Destroy this transport
+	deleteLater ();
+	
 }
 
 void Nuria::HttpTcpTransport::forceClose () {
-	QObject::disconnect (this->d_ptr->socket, SIGNAL(disconnected()),
-			     this, SIGNAL(aboutToClose()));
+	disconnect (this->d_ptr->socket, &QTcpSocket::disconnected,
+	            this, &HttpTransport::connectionLost);
 	
 	this->d_ptr->socket->close ();
-	setOpenMode (NotOpen);
-	
-	emit aboutToClose ();
+	deleteLater ();
 }
 
 bool Nuria::HttpTcpTransport::closeSocketWhenBytesWereWritten() {
@@ -180,4 +219,46 @@ bool Nuria::HttpTcpTransport::closeSocketWhenBytesWereWritten() {
 	}
 	
 	return false;
+}
+
+void Nuria::HttpTcpTransport::closeInternal () {
+	if (closeSocketWhenBytesWereWritten ()) {
+	        return;
+	}
+	
+	// Wait for socket to completely send write buffer.
+	if (this->d_ptr->sslSocket) {
+	        connect (this->d_ptr->sslSocket, SIGNAL(encryptedBytesWritten(qint64)),
+		         SLOT(closeSocketWhenBytesWereWritten()));
+	} else {
+	        connect (this->d_ptr->socket, SIGNAL(bytesWritten(qint64)),
+		         SLOT(closeSocketWhenBytesWereWritten()));
+	}
+	
+}
+
+bool Nuria::HttpTcpTransport::wasLastRequest () {
+	return (maxRequests () >= 0 && currentRequestCount () >= maxRequests ());
+}
+
+void Nuria::HttpTcpTransport::startTimeout (HttpTransport::Timeout mode) {
+	return;
+	killTimeout ();
+	
+	// Start new timer
+	int msec = timeout (mode);
+	if (msec >= 0) {
+		this->d_ptr->timeoutTimer = startTimer (msec);
+	} else {
+		this->d_ptr->timeoutTimer = -1;
+	}
+	
+}
+
+void Nuria::HttpTcpTransport::killTimeout () {
+	if (this->d_ptr->timeoutTimer >= 0) {
+		killTimer (this->d_ptr->timeoutTimer);
+		this->d_ptr->timeoutTimer = -1;
+	}
+	
 }

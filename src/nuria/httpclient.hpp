@@ -91,8 +91,7 @@ class SlotInfo;
  */
 class NURIA_NETWORK_EXPORT HttpClient : public QIODevice {
 	Q_OBJECT
-	Q_ENUMS(HttpVerb)
-	Q_ENUMS(HttpHeader)
+	Q_ENUMS(HttpVerb HttpHeader)
 	Q_FLAGS(HttpVerbs)
 public:
 	
@@ -168,6 +167,50 @@ public:
 		
 	};
 	
+	/** Transfer modes for responses. */
+	enum TransferMode {
+		
+		/**
+		 * Default for "Connection: close" requests. The response will
+		 * be streamed to the remote peer. It is not possible to send
+		 * additional response HTTP headers after the first write()
+		 * call. This mode doesn't support reusing the same connection
+		 * for other requests.
+		 */
+		Streaming = 0,
+		
+		/**
+		 * Support for both "Connection" 'close' and 'keep-alive'
+		 * connections. All calls to write() will be buffered until
+		 * close() is called on the HttpClient instance, after which
+		 * all buffered data will be sent. It is possible to change
+		 * response headers until that at all times. The Content-Type
+		 * and Content-Length response headers will be set
+		 * automatically.
+		 * 
+		 * \note Internally a TemporaryBufferDevice is used.
+		 */
+		Buffered,
+		
+		/**
+		 * Default for "Connection: keep-alive" requests. The response
+		 * will be streamed with a transfer-encoding of 'chunked'. This
+		 * mode supports reusing the same connection for further
+		 * requests.
+		 */
+		ChunkedStreaming
+	};
+	
+	/** Connection modes. */
+	enum ConnectionMode {
+		
+		/** The connection will be closed after this request. */
+		ConnectionClose = 0,
+		
+		/** The connection will be kept alive after this request. */
+		ConnectionKeepAlive
+	};
+	
 	/** Map used to store HTTP headers in a name -> value fashion. */
 	typedef QMultiMap< QByteArray, QByteArray > HeaderMap;
 	
@@ -181,9 +224,7 @@ public:
 	/** Destructor. */
 	virtual ~HttpClient ();
 	
-	/**
-	 * Returns the internal HttpTransport instance.
-	 */
+	/** Returns the internal HttpTransport instance. */
 	HttpTransport *transport () const;
 	
 	/**
@@ -535,6 +576,27 @@ public:
 	 */
 	HttpPostBodyReader *postBodyReader ();
 	
+	/** Returns the used transfer mode. */
+	TransferMode transferMode () const;
+	
+	/**
+	 * Sets the transfer \a mode. This is only possible to do before
+	 * anything has been sent. On success, \c true is returned.
+	 */
+	bool setTransferMode (TransferMode mode);
+	
+	/** Returns the connection mode of this client. */
+	ConnectionMode connectionMode () const;
+	
+	/**
+	 * Returns \c true if the request has been completely received.
+	 * This includes the POST/PUT body if one exists.
+	 */
+	bool requestCompletelyReceived () const;
+	
+	/** Returns \c true if the request has a POST/PUT body. */
+	bool requestHasPostBody () const;
+	
 	/**
 	 * Returns \c true if the POST body has been completely read by the
 	 * user. Also returns \c true if the request has no POST body at all.
@@ -594,7 +656,8 @@ public slots:
 	void close () override;
 	
 	/**
-	 * Closes the socket without caring about the write buffer.
+	 * Tells the transport to immediately close the connection, without
+	 * trying to send data in the send buffers.
 	 * \warning This may cause data-loss!
 	 */
 	void forceClose ();
@@ -603,9 +666,6 @@ private slots:
 	
 	/** The client has disconnected. */
 	void clientDisconnected ();
-	
-	/** Received data from the client. */
-	void receivedData ();
 	
 	/** The pipe io device has some data for us. */
 	void pipeToClientReadyRead ();
@@ -628,9 +688,10 @@ protected:
 	/**
 	 * Takes care of buffering the POST body.
 	 */
-	bool bufferPostBody ();
+	bool bufferPostBody (QByteArray &data);
 	
 private:
+	friend class HttpTransport;
 	friend class HttpServer;
 	friend class HttpNode;
 	
@@ -647,24 +708,29 @@ private:
 	 */
 	void readRequestCookies ();
 	
+	void bytesSent (qint64 bytes);
+	void processData (QByteArray &data);
+	
+	qint64 sendChunkedData (const char *data, qint64 len);
 	qint64 parseIntegerHeaderValue (const QByteArray &value);
 	bool readPostBodyContentLength ();
 	bool send100ContinueIfClientExpectsIt ();
-	bool readAllAvailableHeaderLines ();
+	bool readAllAvailableHeaderLines (QByteArray &data);
 	bool readFirstLine (const QByteArray &line);
 	bool readHeader (const QByteArray &line);
 	bool isReceivedHeaderHttp11Compliant ();
 	bool verifyPostRequestCompliance ();
 	bool verifyCompleteHeader ();
 	bool invokeRequestedPath ();
+	bool readConnectionHeader ();
 	bool closeConnectionIfNoLongerNeeded ();
-	bool verifyRequestBodyOrClose ();
-	bool requestHasPostBody () const;
 	bool postProcessRequestHeader ();
 	bool contentTypeIsMultipart (const QByteArray &value) const;
 	bool contentTypeIsUrlEncoded (const QByteArray &value) const;
 	HttpPostBodyReader *createHttpMultiPartReader (const QByteArray &header);
 	HttpPostBodyReader *createUrlEncodedPartReader (const QByteArray &header);
+	qint64 writeDataInternal (const char *data, qint64 len);
+	void closeInternal ();
 	
 	/**
 	 * Sends a chunk of the pipeToClient() device to the client.

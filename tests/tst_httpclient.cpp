@@ -47,6 +47,26 @@ bool TestNode::invokePath (const QString &path, const QStringList &parts,
 	Q_UNUSED(index)
 	Q_UNUSED(client)
 	
+	// Transfer mode tests
+	if (path == "/default") {
+		client->write ("default");
+		return true;
+		
+	} else if (path == "/chunked") {
+		client->setTransferMode (HttpClient::ChunkedStreaming);
+		client->write ("0123456789");
+		client->write ("abc");
+		return true;
+		
+	} else if (path == "/buffered") {
+		client->setTransferMode (HttpClient::Buffered);
+		client->write ("abc");
+		client->write ("defg");
+		return true;
+	}
+	
+	// 
+	client->setTransferMode (HttpClient::Buffered);
 	if (path == "/to_buffer") {
 		client->pipeFromPostBody (fromClientBuffer);
 		client->setKeepConnectionOpen (true);
@@ -109,8 +129,8 @@ private slots:
 	void getWithPostBodyKillsConnection ();
 	void postWithoutContentLengthKillsConnection ();
 	void postWithTooMuchData ();
-	void postWithoutChunkedTransfer ();
-	void postWithChunkedTransfer ();
+	void postWithout100Continue ();
+	void postWith100Continue ();
 	void pipeToClientBuffer ();
 	void pipeToClientFile ();
 	void pipeToClientProcess ();
@@ -120,13 +140,18 @@ private slots:
 	void bodyReaderForMultipartNoBoundaryGiven ();
 	void bodyReaderForUrlEncoded ();
 	void parseCookiesFromHeader ();
+	void verifyChunkedTransfer ();
+	void verifyBuffered ();
+	void verifyKeepAliveBehaviour ();
 	
 private:
 	
 	HttpClient *createClient (const QByteArray &request) {
-		HttpMemoryTransport *transport = new HttpMemoryTransport;
+		HttpMemoryTransport *transport = new HttpMemoryTransport (this);
 		HttpClient *client = new HttpClient (transport, server);
-		transport->setIncoming (request);
+		transport->setMaxRequests (1);
+		transport->process (client, request);
+		
 		return client;
 	}
 	
@@ -145,13 +170,14 @@ void HttpClientTest::initTestCase () {
 
 void HttpClientTest::getHttp10 () {
 	QByteArray input = "GET / HTTP/1.0\r\n\r\n";
-	QByteArray expected = "HTTP/1.0 200 OK\r\nConnection: Close\r\n\r\n/";
+	QByteArray expected = "HTTP/1.0 200 OK\r\nConnection: close\r\nContent-Length: 1\r\n\r\n/";
 	
 	QTest::ignoreMessage (QtDebugMsg, "/");
+	QTest::ignoreMessage (QtDebugMsg, "close()");
 	HttpClient *client = createClient (input);
 	HttpMemoryTransport *transport = getTransport (client);
 	
-	QCOMPARE(transport->outData (), expected);
+	QCOMPARE(transport->outData, expected);
 }
 
 QByteArray &insertDateTime (QByteArray &data) {
@@ -163,27 +189,30 @@ QByteArray &insertDateTime (QByteArray &data) {
 void HttpClientTest::getHttp11Compliant () {
 	QByteArray input = "GET / HTTP/1.1\r\n"
 			   "Host: example.com\r\n"
+	                   "Connection: close\r\n"
 			   "\r\n";
 	
-	QByteArray expected = "HTTP/1.1 200 OK\r\nConnection: Close\r\nDate: %%\r\n\r\n/";
+	QByteArray expected = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 1\r\nDate: %%\r\n\r\n/";
 	insertDateTime (expected);
 	
 	QTest::ignoreMessage (QtDebugMsg, "/");
+	QTest::ignoreMessage (QtDebugMsg, "close()");
 	HttpClient *client = createClient (input);
 	HttpMemoryTransport *transport = getTransport (client);
 	
-	QCOMPARE(transport->outData (), expected);
+	QCOMPARE(transport->outData, expected);
 }
 
 void HttpClientTest::getHttp11NotCompliantKillsConnection () {
 	QByteArray input = "GET / HTTP/1.1\r\n\r\n";
-	QByteArray expected = "HTTP/1.1 400 Bad Request\r\nConnection: Close\r\nDate: %%\r\n\r\nBad Request";
+	QByteArray expected = "HTTP/1.1 400 Bad Request\r\nConnection: close\r\nDate: %%\r\n\r\nBad Request";
 	insertDateTime (expected);
 	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
 	HttpClient *client = createClient (input);
 	HttpMemoryTransport *transport = getTransport (client);
 	
-	QCOMPARE(transport->outData (), expected);
+	QCOMPARE(transport->outData, expected);
 }
 
 void HttpClientTest::getWithPostBodyKillsConnection () {
@@ -192,13 +221,14 @@ void HttpClientTest::getWithPostBodyKillsConnection () {
 			   "Content-Length: 10\r\n"
 			   "\r\n"
 			   "0123456789";
-	QByteArray expected = "HTTP/1.1 400 Bad Request\r\nConnection: Close\r\nDate: %%\r\n\r\nBad Request";
+	QByteArray expected = "HTTP/1.1 400 Bad Request\r\nConnection: close\r\nDate: %%\r\n\r\nBad Request";
 	insertDateTime (expected);
 	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
 	HttpClient *client = createClient (input);
 	HttpMemoryTransport *transport = getTransport (client);
 	
-	QCOMPARE(transport->outData (), expected);
+	QCOMPARE(transport->outData, expected);
 }
 
 void HttpClientTest::postWithoutContentLengthKillsConnection () {
@@ -207,97 +237,105 @@ void HttpClientTest::postWithoutContentLengthKillsConnection () {
 			   "\r\n"
 			   "0123456789";
 	QByteArray expected = "HTTP/1.1 400 Bad Request\r\n"
-			      "Connection: Close\r\nDate: %%\r\n\r\nBad Request";
+			      "Connection: close\r\nDate: %%\r\n\r\nBad Request";
 	insertDateTime (expected);
 	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
 	HttpClient *client = createClient (input);
 	HttpMemoryTransport *transport = getTransport (client);
 	
-	QCOMPARE(transport->outData (), expected);
+	QCOMPARE(transport->outData, expected);
 }
-
 
 void HttpClientTest::postWithTooMuchData () {
 	QByteArray input = "POST / HTTP/1.1\r\n"
 			   "Host: example.com\r\n"
 			   "Content-Length: 9\r\n"
+	                   "Connection: close\r\n"
 			   "\r\n"
 			   "0123456789";
 	QByteArray expected = "HTTP/1.1 413 Request Entity Too Large\r\n"
-			      "Connection: Close\r\nDate: %%\r\n\r\nRequest Entity Too Large";
+			      "Connection: close\r\nDate: %%\r\n\r\nRequest Entity Too Large";
 	insertDateTime (expected);
 	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
 	HttpClient *client = createClient (input);
 	HttpMemoryTransport *transport = getTransport (client);
 
-	QCOMPARE(transport->outData (), expected);
+	QCOMPARE(transport->outData, expected);
 }
 
-void HttpClientTest::postWithoutChunkedTransfer () {
-	QByteArray input = "POST / HTTP/1.1\r\n"
+void HttpClientTest::postWithout100Continue () {
+	QByteArray input = "POST / HTTP/1.0\r\n"
 			   "Host: example.com\r\n"
 			   "Content-Length: 10\r\n"
 			   "\r\n"
 			   "0123456789";
-	QByteArray expected = "HTTP/1.1 200 OK\r\n"
-			      "Connection: Close\r\nDate: %%\r\n\r\n"
+	QByteArray expected = "HTTP/1.0 200 OK\r\n"
+	                      "Connection: close\r\n"
+	                      "Content-Length: 10\r\n\r\n"
 			      "0123456789";
-	insertDateTime (expected);
 	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
 	HttpClient *client = createClient (input);
 	HttpMemoryTransport *transport = getTransport (client);
 	
-	QCOMPARE(transport->outData (), expected);
+	QCOMPARE(transport->outData, expected);
 }
 
-void HttpClientTest::postWithChunkedTransfer () {
-	QByteArray input = "POST / HTTP/1.1\r\n"
+void HttpClientTest::postWith100Continue () {
+	QByteArray input = "POST / HTTP/1.0\r\n"
 			   "Host: example.com\r\n"
 			   "Content-Length: 10\r\n"
 			   "Expect: 100-continue\r\n"
 			   "\r\n"
 			   "0123456789";
-	QByteArray expected = "HTTP/1.1 100 Continue\r\n\r\n"
-			      "HTTP/1.1 200 OK\r\n"
-			      "Connection: Close\r\nDate: %%\r\n\r\n"
+	QByteArray expected = "HTTP/1.0 100 Continue\r\n\r\n"
+			      "HTTP/1.0 200 OK\r\n"
+			      "Connection: close\r\n"
+	                      "Content-Length: 10\r\n\r\n"
 			      "0123456789";
-	insertDateTime (expected);
 	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
 	HttpClient *client = createClient (input);
 	HttpMemoryTransport *transport = getTransport (client);
 	
-	QCOMPARE(transport->outData (), expected);
+	QCOMPARE(transport->outData, expected);
 }
 
 void HttpClientTest::pipeToClientBuffer () {
 	QByteArray input = "GET /buffer HTTP/1.1\r\n"
 			   "Host: example.com\r\n"
+	                   "Connection: close\r\n"
 			   "\r\n";
 	
-	QByteArray expected = "HTTP/1.1 200 OK\r\nConnection: Close\r\nDate: %%\r\n\r\n"
+	QByteArray expected = "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 10\r\nDate: %%\r\n\r\n"
 			      "0123456789";
 	insertDateTime (expected);
 	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
 	HttpClient *client = createClient (input);
 	HttpMemoryTransport *transport = getTransport (client);
 	
-	QCOMPARE(transport->outData (), expected);
+	QCOMPARE(transport->outData, expected);
 }
 
 void HttpClientTest::pipeToClientFile () {
 	QByteArray input = "GET /file HTTP/1.1\r\n"
 			   "Host: example.com\r\n"
+	                   "Connection: close\r\n"
 			   "\r\n";
 	
-	QByteArray expected = "HTTP/1.1 200 OK\r\nConnection: Close\r\n"
+	QByteArray expected = "HTTP/1.1 200 OK\r\nConnection: close\r\n"
 			      "Content-Length: 10\r\nDate: %%\r\n\r\n"
 			      "0123456789";
 	insertDateTime (expected);
 	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
 	HttpClient *client = createClient (input);
 	HttpMemoryTransport *transport = getTransport (client);
 	
-	QCOMPARE(transport->outData (), expected);
+	QCOMPARE(transport->outData, expected);
 }
 
 static void runEventLoopUntil (QObject *object, const char *signal, int timeout = 1000) {
@@ -316,37 +354,45 @@ void HttpClientTest::pipeToClientProcess () {
 	
 	QByteArray input = "GET /process HTTP/1.1\r\n"
 			   "Host: example.com\r\n"
+	                   "Connection: close\r\n"
 			   "\r\n";
 	
-	QByteArray expected = "HTTP/1.1 200 OK\r\nConnection: Close\r\n"
+	QByteArray expected = "HTTP/1.1 200 OK\r\nConnection: close\r\n"
 			      "Date: %%\r\n\r\n"
 			      "hello\n";
 	insertDateTime (expected);
 	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
 	HttpClient *client = createClient (input);
 	HttpMemoryTransport *transport = getTransport (client);
 	runEventLoopUntil (client, SIGNAL(aboutToClose()));
 	
-	QCOMPARE(transport->outData (), expected);
-	QVERIFY(!transport->isOpen ());
+	QCOMPARE(transport->outData, expected);
+	QVERIFY(!client->isOpen ());
 }
 
 void HttpClientTest::pipeFromClientBuffer () {
 	QByteArray input = "POST /to_buffer HTTP/1.1\r\n"
 			   "Host: example.com\r\n"
 			   "Content-Length: 10\r\n"
+	                   "Connection: close\r\n"
 			   "\r\n"
 			   "0123456789";
 	
-	QByteArray expected = "HTTP/1.1 200 OK\r\nConnection: Close\r\nDate: %%\r\n\r\n";
+	QByteArray expected = "HTTP/1.1 200 OK\r\n"
+	                      "Connection: close\r\n"
+	                      "Content-Length: 0\r\n"
+	                      "Date: %%\r\n\r\n";
 	insertDateTime (expected);
 	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
 	HttpClient *client = createClient (input);
 	HttpMemoryTransport *transport = getTransport (client);
 	client->close (); // We keep the connection open in the TestNode above.
 	
 	node->fromClientBuffer->close ();
-	QCOMPARE(transport->outData (), expected);
+	
+	QCOMPARE(transport->outData, expected);
 	QCOMPARE(node->fromClientBuffer->data (), QByteArray ("0123456789"));
 	
 	// 
@@ -363,22 +409,25 @@ void HttpClientTest::pipeFromClientProcess () {
 	QByteArray input = "POST /to_process HTTP/1.1\r\n"
 			   "Host: example.com\r\n"
 			   "Content-Length: 8\r\n"
+	                   "Connection: close\r\n"
 			   "\r\n"
 			   "one\n"
 			   "two\n";
 	
-	QByteArray expected = "HTTP/1.1 200 OK\r\nConnection: Close\r\n"
+	QByteArray expected = "HTTP/1.1 200 OK\r\n"
+	                      "Connection: close\r\n"
 			      "Date: %%\r\n\r\n"
 			      "two\n"
 			      "one\n";
 	insertDateTime (expected);
 	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
 	HttpClient *client = createClient (input);
 	HttpMemoryTransport *transport = getTransport (client);
 	runEventLoopUntil (client, SIGNAL(aboutToClose()));
 	
-	QCOMPARE(transport->outData (), expected);
-	QVERIFY(!transport->isOpen ());
+	QCOMPARE(transport->outData, expected);
+	QVERIFY(!client->isOpen ());
 }
 
 void HttpClientTest::bodyReaderForMultipart () {
@@ -386,6 +435,7 @@ void HttpClientTest::bodyReaderForMultipart () {
 	                   "Content-Type: multipart/form-data; boundary=asdasdasd\r\n"
 	                   "Content-Length: 10\r\n\r\n0123456789";
 	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
 	HttpClient *client = createClient (input);
 	QCOMPARE(node->readerClassName, QByteArray ("Nuria::HttpMultiPartReader"));
 }
@@ -395,6 +445,7 @@ void HttpClientTest::bodyReaderForMultipartNoBoundaryGiven () {
 	                   "Content-Type: multipart/form-data; \r\n"
 	                   "Content-Length: 10\r\n\r\n0123456789";
 	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
 	HttpClient *client = createClient (input);
 	QVERIFY(node->readerClassName.isEmpty ());
 	
@@ -405,6 +456,7 @@ void HttpClientTest::bodyReaderForUrlEncoded () {
 	                   "Content-Type: application/x-www-form-urlencoded; charset=UTF-8\r\n"
 	                   "Content-Length: 10\r\n\r\n0123456789";
 	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
 	HttpClient *client = createClient (input);
 	QCOMPARE(node->readerClassName, QByteArray ("Nuria::HttpUrlEncodedReader"));
 }
@@ -413,12 +465,77 @@ void HttpClientTest::parseCookiesFromHeader () {
 	QByteArray input = "GET / HTTP/1.0\r\n"
 	                   "Cookie: foo=bar; nuria=project\r\n\r\n";
 	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
+	QTest::ignoreMessage (QtDebugMsg, "/");
 	HttpClient *client = createClient (input);
 	HttpClient::Cookies cookies = client->cookies ();
 	
 	QCOMPARE(cookies.size (), 2);
 	QCOMPARE(cookies.value ("foo").value (), QByteArray ("bar"));
 	QCOMPARE(cookies.value ("nuria").value (), QByteArray ("project"));
+	
+}
+
+void HttpClientTest::verifyChunkedTransfer () {
+	QByteArray input = "GET /chunked HTTP/1.0\r\n\r\n";
+	QByteArray expected = "HTTP/1.0 200 OK\r\n"
+	                      "Connection: close\r\n"
+	                      "Transfer-Encoding: chunked\r\n\r\n"
+	                      "a\r\n"
+	                      "0123456789\r\n"
+	                      "3\r\n"
+	                      "abc\r\n"
+	                      "0\r\n\r\n";
+	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
+	HttpClient *client = createClient (input);
+	HttpMemoryTransport *transport = getTransport (client);
+	
+	QCOMPARE(transport->outData, expected);
+}
+
+void HttpClientTest::verifyBuffered () {
+	QByteArray input = "GET /buffered HTTP/1.0\r\n\r\n";
+	QByteArray expected = "HTTP/1.0 200 OK\r\n"
+	                      "Connection: close\r\n"
+	                      "Content-Length: 7\r\n\r\n"
+	                      "abcdefg";
+	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
+	HttpClient *client = createClient (input);
+	HttpMemoryTransport *transport = getTransport (client);
+	
+	QCOMPARE(transport->outData, expected);
+}
+
+void HttpClientTest::verifyKeepAliveBehaviour () {
+	QByteArray input = "GET /default HTTP/1.0\r\n"
+	                   "Connection: keep-alive\r\n\r\n"
+	                   "GET /default HTTP/1.0\r\n"
+	                   "Connection: keep-alive\r\n\r\n";
+	QByteArray expected = "HTTP/1.0 200 OK\r\n"
+	                      "Connection: keep-alive\r\n"
+	                      "Transfer-Encoding: chunked\r\n\r\n"
+	                      "7\r\ndefault\r\n"
+	                      "0\r\n\r\n"
+	                      "HTTP/1.0 200 OK\r\n"
+	                      "Connection: close\r\n\r\n"
+	                      "default";
+	
+	// 
+	HttpMemoryTransport *transport = new HttpMemoryTransport (this);
+	HttpClient *clientA = new HttpClient (transport, server);
+	HttpClient *clientB = new HttpClient (transport, server);
+	
+	// Do two requests
+	transport->setMaxRequests (2);
+	input = transport->process (clientA, input);
+	transport->process (clientB, input);
+	
+	// 
+//	qDebug() << expected;
+//	qDebug() << transport->outData;
+	QCOMPARE(transport->outData, expected);
 	
 }
 

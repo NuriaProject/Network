@@ -90,6 +90,23 @@ public:
 	 */
 	void applyRangeHeaders (qint64 begin, qint64 end, qint64 totalLength,
 				HttpClient::HeaderMap &headers);
+	
+	/**
+	 * Adds a Transfer-Encoding header to \a headers if \a mode and
+	 * \a encoding indicate chunked transfer. If there's already a
+	 * Transfer-Encoding header, it will be modified accordingly.
+	 */
+	void addTransferEncodingHeader (HttpClient::TransferMode mode, HttpClient::HeaderMap &headers);
+	
+	/**
+	 * Adds \a connectionValue to \a headers, if it is not empty,
+	 * \a count is less than \a max and \a max is not \c -1. If the that
+	 * condition is false, the function will add "Connection: close"
+	 * instead.
+	 */
+	void addConnectionHeader (HttpClient::ConnectionMode mode, int count, int max,
+	                          HttpClient::HeaderMap &headers);
+	
 private:
 	
 };

@@ -25,6 +25,7 @@ class QTcpSocket;
 namespace Nuria {
 
 class HttpTcpTransportPrivate;
+class HttpServer;
 
 /**
  * \brief HttpClient transport for TCP with or without SSL connections.
@@ -34,7 +35,7 @@ class NURIA_NETWORK_EXPORT HttpTcpTransport : public HttpTransport {
 public:
 	
 	/** Constructor. */
-	explicit HttpTcpTransport (QTcpSocket *socket, QObject *parent = 0);
+	explicit HttpTcpTransport (QTcpSocket *socket, HttpServer *server);
 	
 	/** Destructor. */
 	~HttpTcpTransport () override;
@@ -46,34 +47,31 @@ public:
 	quint16 localPort () const override;
 	QHostAddress peerAddress () const override;
 	quint16 peerPort () const override;
+	bool isOpen () const override;
 	
-	bool isSequential () const override;
-	bool open (OpenMode mode) override;
-	void close () override;
-	qint64 pos () const override;
-	qint64 size () const override;
-	bool seek (qint64 pos) override;
-	bool atEnd () const override;
-	bool reset () override;
-	qint64 bytesAvailable () const override;
-	qint64 bytesToWrite () const override;
-	bool canReadLine () const override;
-	bool waitForReadyRead (int msecs) override;
-	bool waitForBytesWritten (int msecs) override;
-
 public slots:
-	bool flush () override;
+	bool flush (HttpClient *client) override;
 	void forceClose () override;
 	
 private slots:
 	bool closeSocketWhenBytesWereWritten ();
 	
 protected:
-	qint64 readData (char *data, qint64 maxlen) override;
-	qint64 readLineData (char *data, qint64 maxlen) override;
-	qint64 writeData (const char *data, qint64 len) override;
+	void close (HttpClient *client) override;
+	bool sendToRemote (HttpClient *client, const QByteArray &data) override;
+	void timerEvent (QTimerEvent *) override;
 	
 private:
+	void clientDestroyed (QObject *object);
+	void bytesWritten (qint64 bytes);
+	void processData (QByteArray &data);
+	void dataReceived ();
+	void clientDisconnected ();
+	void closeInternal ();
+	bool wasLastRequest ();
+	void startTimeout (Timeout mode);
+	void killTimeout ();
+	
 	HttpTcpTransportPrivate *d_ptr;
 	
 };

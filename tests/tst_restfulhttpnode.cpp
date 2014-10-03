@@ -43,15 +43,16 @@ private slots:
 private:
 	HttpClient *createClient (const QByteArray &method, bool withBody = false) {
 		HttpMemoryTransport *transport = new HttpMemoryTransport;
+		HttpClient *client = new HttpClient (transport, this->server);
 		
 		if (!withBody) {
-			transport->setIncoming (method + " /api/annotate/42 HTTP/1.0\r\n\r\n");
+			transport->process (client, method + " /api/annotate/42 HTTP/1.0\r\n\r\n");
 		} else {
-			transport->setIncoming (method + " /api/annotate/42 HTTP/1.0\r\n"
+			transport->process (client, method + " /api/annotate/42 HTTP/1.0\r\n"
 						"Content-Length: 10\r\n\r\n1234567890");
 		}
-			
-		return new HttpClient (transport, server);
+		
+		return client;
 	}
 	
 	HttpMemoryTransport *getTransport (HttpClient *client) {
@@ -59,11 +60,8 @@ private:
 	}
 	
 	void reopenTransport () {
-		transport->blockSignals (true);
-		transport->clearOutgoing ();
-		transport->open (QIODevice::ReadWrite);
+		transport->outData.clear ();
 		client->open (QIODevice::ReadWrite);
-		transport->blockSignals (false);
 	}
 	
 	HttpMemoryTransport *transport = new HttpMemoryTransport;
@@ -76,10 +74,8 @@ private:
 void RestfulHttpNodeTest::initTestCase () {
 	server->root ()->addNode (node);
 	
-	transport->setIncoming ("GET / HTTP/1.0\r\n\r\n");
-	qApp->processEvents ();
+	transport->process (client, "GET / HTTP/1.0\r\n\r\n");
 	reopenTransport ();
-	
 }
 
 void RestfulHttpNodeTest::registeringAHandler () {
@@ -120,7 +116,7 @@ void RestfulHttpNodeTest::invokeAnnotatedHandler () {
 	
 	reopenTransport ();
 	QVERIFY(node->invokeTest ("annotate/123/true/foo", client));
-	QByteArray outData = transport->outData ();
+	QByteArray outData = transport->outData;
 	outData.replace (' ', ""); // Remove spaces to be consistent across Qt versions.
 	
 	QCOMPARE(outData, QByteArray ("{\"boolean\":true,\"integer\":123,\"string\":\"foo\"}"));
@@ -143,7 +139,7 @@ void RestfulHttpNodeTest::invokeAnnotatedSpecificHandler () {
 	HttpMemoryTransport *transport = getTransport (client);
 	qApp->processEvents ();
 	
-	QByteArray result = transport->outData ().split ('\n').last ();
+	QByteArray result = transport->outData.split ('\n').last ();
 	QByteArray expected = method.toLatin1 () + " 42";
 	QCOMPARE(result, expected);
 }
@@ -165,19 +161,14 @@ void RestfulHttpNodeTest::invokeNonStreamingPostHandlerLater () {
 	HttpClient *postClient = new HttpClient (transport, server);
 	
 	// Invoke
-	transport->setIncoming ("POST /api/nostream/1-2/3 HTTP/1.0\r\n"
-				"Content-Length: 10\r\n\r\n12345678");
+	transport->process (postClient, "POST /api/nostream/1-2/3 HTTP/1.0\r\n"
+	                                "Content-Length: 10\r\n\r\n12345678");
 	qApp->processEvents ();
 	QVERIFY(postClient->slotInfo ().isValid ());
 	
 	// 
 	QVERIFY(!invoked);
-	transport->ingoing->close ();
-	transport->ingoing->setData (transport->ingoing->data () + "90");
-	transport->ingoing->open (QIODevice::ReadOnly);
-	transport->ingoing->seek (transport->ingoing->data ().length () - 2);
-	emit transport->readyRead ();
-	
+	transport->process (postClient, "90");
 	QVERIFY(invoked);
 	
 }
