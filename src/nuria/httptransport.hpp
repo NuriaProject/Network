@@ -53,7 +53,7 @@ public:
 	enum {
 		
 		/** Maximum requests per transport in a keep-alive session. */
-		MaxRequestsDefault = 5,
+		MaxRequestsDefault = 10,
 		
 		/** Default value for ConnectTimeout. In msec. */
 		DefaultConnectTimeout = 2000,

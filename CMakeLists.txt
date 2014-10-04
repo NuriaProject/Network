@@ -27,6 +27,8 @@ SET(NuriaNetwork_SRC
     src/nuria/httpparser.hpp
     src/httppostbodyreader.cpp
     src/nuria/httppostbodyreader.hpp
+    src/httpfilter.cpp
+    src/nuria/httpfilter.hpp
     src/httpserver.cpp
     src/nuria/httpserver.hpp
     src/httptcptransport.cpp
@@ -41,6 +43,10 @@ SET(NuriaNetwork_SRC
     src/sslserver.cpp
     src/nuria/sslserver.hpp
     src/private/httpprivate.hpp
+    src/private/standardfilters.cpp
+    src/private/standardfilters.hpp
+    src/private/crc32.h
+    src/private/adler32.h
 )
 
 # 

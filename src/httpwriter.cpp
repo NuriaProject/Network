@@ -220,7 +220,7 @@ void Nuria::HttpWriter::addTransferEncodingHeader (HttpClient::TransferMode mode
 	}
 	
 	// Store
-	headers.insert (transEncodingHeader, headerValue);
+	headers.replace (transEncodingHeader, headerValue);
 	
 }
 

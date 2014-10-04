@@ -17,6 +17,7 @@
 #include <QObject>
 
 #include "httpmemorytransport.hpp"
+#include <nuria/httpfilter.hpp>
 #include <nuria/httpserver.hpp>
 #include <nuria/httpwriter.hpp>
 #include <nuria/httpnode.hpp>
@@ -39,6 +40,64 @@ public:
 	
 	static void dummy (HttpClient *client)
 	{ client->write (client->readAll ()); }
+};
+
+class RotFilter : public HttpFilter {
+public:
+	RotFilter (QObject *p) : HttpFilter (p) {}
+	
+	QByteArray filterName () const override
+	{ return "rot"; }
+	
+	bool filterHeaders (HttpClient *, HttpClient::HeaderMap &headers) override
+	{ headers.insert ("Foo", "bar"); return true; }
+	
+	QByteArray filterBegin (HttpClient *) override
+	{ return "begin\r\n"; }
+	
+	bool filterData (HttpClient *, QByteArray &data) override {
+		for (int i = 0; i < data.length (); i++)
+			data[i] = data[i] + 1;
+		return true;
+	}
+	
+	QByteArray filterEnd (HttpClient *) override
+	{ return "\r\nend"; }
+};
+
+class UnnamedFilter : public HttpFilter {
+public:
+	UnnamedFilter (QObject *p) : HttpFilter (p) {}
+	
+	bool filterHeaders (HttpClient *, HttpClient::HeaderMap &headers) override
+	{ headers.insert ("Nuria", "project"); return true; }
+	
+	QByteArray filterBegin (HttpClient *) override
+	{ return "rev\r\n"; }
+	
+	bool filterData (HttpClient *, QByteArray &data) override {
+		std::reverse (data.begin (), data.end ());
+		return true;
+	}
+	
+	QByteArray filterEnd (HttpClient *) override
+	{ return "\r\nver"; }
+	
+};
+
+class FailingFilter : public HttpFilter {
+public:
+	FailingFilter (QObject *p) : HttpFilter (p) {}
+	
+	bool failHeaders = false;
+	bool failData = false;
+	
+	bool filterHeaders (HttpClient *, HttpClient::HeaderMap &)
+	{ return !failHeaders; }
+	
+	bool filterData (HttpClient *, QByteArray &)
+	{ return !failData; }
+	
 };
 
 bool TestNode::invokePath (const QString &path, const QStringList &parts,
@@ -109,6 +168,19 @@ bool TestNode::invokePath (const QString &path, const QStringList &parts,
 		process->setReadChannel (QProcess::StandardOutput);
 		client->pipeToClient (process);
 		
+	} else if (path == "/gzip") {
+		client->addFilter (HttpClient::GzipFilter);
+		client->write ("NuriaProject");
+		
+	} else if (path == "/deflate") {
+		client->addFilter (HttpClient::DeflateFilter);
+		client->write ("NuriaProject");
+		
+	} else if (path == "/filter") {
+		client->addFilter (new UnnamedFilter (client));
+		client->addFilter (new RotFilter (client));
+		client->write ("abcdef");
+		
 	} else {
 		qDebug("%s", qPrintable(path));
 		client->write (path.toLatin1 ());
@@ -143,6 +215,9 @@ private slots:
 	void verifyChunkedTransfer ();
 	void verifyBuffered ();
 	void verifyKeepAliveBehaviour ();
+	void filterIsAddedToTransferEncoding ();
+	void verifyGzipFilter ();
+	void verifyDeflateFilter ();
 	
 private:
 	
@@ -529,14 +604,68 @@ void HttpClientTest::verifyKeepAliveBehaviour () {
 	
 	// Do two requests
 	transport->setMaxRequests (2);
+	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
 	input = transport->process (clientA, input);
+	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
 	transport->process (clientB, input);
 	
 	// 
-//	qDebug() << expected;
-//	qDebug() << transport->outData;
 	QCOMPARE(transport->outData, expected);
 	
+}
+
+void HttpClientTest::filterIsAddedToTransferEncoding () {
+	QByteArray input = "GET /filter HTTP/1.0\r\n\r\n";
+	QByteArray expected = "HTTP/1.0 200 OK\r\n"
+	                      "Connection: close\r\n"
+	                      "Foo: bar\r\n"
+	                      "Nuria: project\r\n"
+	                      "Transfer-Encoding: rot\r\n\r\n"
+	                      "rev\r\nbegin\r\ngfedcb\r\nver\r\nend";
+	
+	// 
+	QTest::ignoreMessage (QtDebugMsg, "close()");
+	HttpClient *client = createClient (input);
+	HttpMemoryTransport *transport = getTransport (client);
+	
+	QCOMPARE(transport->outData, expected);
+}
+
+void HttpClientTest::verifyGzipFilter () {
+	QByteArray input = "GET /gzip HTTP/1.0\r\n\r\n";
+	static const char data[] = "HTTP/1.0 200 OK\r\n"
+	                           "Connection: close\r\n"
+	                           "Transfer-Encoding: gzip\r\n\r\n"
+	                           "\x1f\x8b\x08\x00\x00\x00\x00\x00"
+	                           "\x00\xff\xf3\x2b\x2d\xca\x4c\x0c"
+	                           "\x28\xca\xcf\x4a\x4d\x2e\x01\x00"
+	                           "\x43\xa8\xad\x4e\x0c\x00\x00\x00";
+	QByteArray expected (data, sizeof(data) - 1);
+	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
+	HttpClient *client = createClient (input);
+	HttpMemoryTransport *transport = getTransport (client);
+	
+	QCOMPARE(transport->outData, expected);
+}
+
+void HttpClientTest::verifyDeflateFilter () {
+	QByteArray input = "GET /deflate HTTP/1.0\r\n\r\n";
+	static const char data[] = "HTTP/1.0 200 OK\r\n"
+	                           "Connection: close\r\n"
+	                           "Transfer-Encoding: deflate\r\n\r\n"
+	                           "\x78\x9c\xf3\x2b\x2d\xca\x4c\x0c"
+	                           "\x28\xca\xcf\x4a\x4d\x2e\x01\x00"
+	                           "\x1f\x00\x04\xd7";
+	QByteArray expected (data, sizeof(data) - 1);
+	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
+	HttpClient *client = createClient (input);
+	HttpMemoryTransport *transport = getTransport (client);
+	
+	QCOMPARE(transport->outData, expected);
 }
 
 QTEST_MAIN(HttpClientTest)

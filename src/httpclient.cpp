@@ -37,10 +37,11 @@
 #include "nuria/httpnode.hpp"
 #include <nuria/debug.hpp>
 
+#include "private/standardfilters.hpp"
 #include "private/httpprivate.hpp"
 
 Nuria::HttpClient::HttpClient (HttpTransport *transport, HttpServer *server)
-	: QIODevice (server), d_ptr (new HttpClientPrivate)
+	: QIODevice (transport), d_ptr (new HttpClientPrivate)
 {
 	
 	// Initialize
@@ -97,7 +98,7 @@ void Nuria::HttpClient::readRequestCookies () {
 }
 
 void Nuria::HttpClient::bytesSent (qint64 bytes) {
-	if (this->d_ptr->pipeDevice) {
+	if (this->d_ptr->pipeDevice && this->d_ptr->pipeDevice->isReadable ()) {
 		QMetaObject::invokeMethod (this, "pipeToClientReadyRead", Qt::QueuedConnection);
 	}
 	
@@ -321,6 +322,55 @@ bool Nuria::HttpClient::requestHasPostBody () const {
 	return (this->d_ptr->requestType == POST || this->d_ptr->requestType == PUT);
 }
 
+void Nuria::HttpClient::addFilter (StandardFilter filter) {
+	HttpFilter *instance = nullptr;
+	
+	switch (filter) {
+	case DeflateFilter:
+		instance = Internal::DeflateFilter::instance ();
+		break;
+	case GzipFilter:
+		instance = Internal::GzipFilter::instance ();
+		break;
+	}
+	
+	// Remove the last one if it's a internal one
+	if (!this->d_ptr->filters.isEmpty () &&
+	    (this->d_ptr->filters.last ()->metaObject () == &Internal::DeflateFilter::staticMetaObject ||
+	     (this->d_ptr->filters.last ()->metaObject () == &Internal::GzipFilter::staticMetaObject))) {
+		this->d_ptr->filters.removeLast ();
+	}
+	
+	// 
+	this->d_ptr->filters.append (instance);
+	
+}
+
+void Nuria::HttpClient::addFilter (HttpFilter *filter) {
+	this->d_ptr->filters.append (filter);
+}
+
+void Nuria::HttpClient::removeFilter (StandardFilter filter) {
+	switch (filter) {
+	case DeflateFilter:
+		removeFilter (Internal::DeflateFilter::instance ());
+		break;
+	case GzipFilter:
+		removeFilter (Internal::GzipFilter::instance ());
+		break;
+	}
+	
+}
+
+void Nuria::HttpClient::removeFilter (HttpFilter *filter) {
+	int idx = this->d_ptr->filters.indexOf (filter);
+	
+	if (idx != -1) {
+		this->d_ptr->filters.remove (idx);
+	}
+	
+}
+
 bool Nuria::HttpClient::postProcessRequestHeader () {
 	if (verifyCompleteHeader () &&
 	    readPostBodyContentLength () &&
@@ -377,6 +427,11 @@ Nuria::HttpPostBodyReader *Nuria::HttpClient::createUrlEncodedPartReader (const 
 bool Nuria::HttpClient::sendPipeChunkToClient () {
 	enum { MaxChunkSize = 16 * 1024 };
 	
+	// 
+	if (!this->d_ptr->pipeDevice->isReadable ()) {
+		return false;
+	}
+	
 	// Respect maxLen
 	qint64 toRead = MaxChunkSize;
 	if (this->d_ptr->pipeMaxlen >= 0 && this->d_ptr->pipeMaxlen < MaxChunkSize) {
@@ -389,7 +444,7 @@ bool Nuria::HttpClient::sendPipeChunkToClient () {
 	if (!data.isEmpty ()) {
 		
 		// Write data into the client stream
-		if (writeDataInternal (data.constData (), data.length ()) != data.length ()) {
+		if (writeDataInternal (data) != data.length ()) {
 			return false;
 		}
 		
@@ -456,22 +511,42 @@ qint64 Nuria::HttpClient::writeData (const char *data, qint64 len) {
 		return this->d_ptr->outBuffer->write (data, len);
 	}
 	
-	return writeDataInternal (data, len);
+	return writeDataInternal (QByteArray::fromRawData (data, len));
 }
 
-qint64 Nuria::HttpClient::writeDataInternal (const char *data, qint64 len) {
+qint64 Nuria::HttpClient::writeDataInternal (QByteArray data) {
+	bool initFilters = !this->d_ptr->headerSent;
 	sendResponseHeader ();
 	
-	// Send chunk
-	if (this->d_ptr->transferMode == ChunkedStreaming) {
-		return sendChunkedData (data, len);
+	// 
+	if (initFilters) {
+		QByteArray head = filterInit ();
+		if (!head.isEmpty () && !sendData (head)) {
+			return -1;
+		}
+		
 	}
 	
-	if (this->d_ptr->transport->sendToRemote (this, QByteArray (data, len))) {
-		return len;
+	// 
+	qint64 origLength = data.length ();
+	if (!filterData (data)) {
+		return -1;
+	}
+	
+	// Send chunk
+	if (sendData (data)) {
+		return origLength;
 	}
 	
 	return -1;
+}
+
+bool Nuria::HttpClient::sendData (const QByteArray &data) {
+	if (this->d_ptr->transferMode == ChunkedStreaming) {
+		return sendChunkedData (data);
+	}
+	
+	return this->d_ptr->transport->sendToRemote (this, data);
 }
 
 bool Nuria::HttpClient::resolveUrl (const QUrl &url) {
@@ -575,27 +650,17 @@ void Nuria::HttpClient::processData (QByteArray &data) {
 	
 }
 
-qint64 Nuria::HttpClient::sendChunkedData (const char *data, qint64 len) {
-	QByteArray chunk = QByteArray::number (len, 16);
+bool Nuria::HttpClient::sendChunkedData (const QByteArray &data) {
+	QByteArray chunk = QByteArray::number (data.length (), 16);
 	chunk.append ("\r\n", 2);
-	chunk.append (data, len);
+	chunk.append (data);
 	chunk.append ("\r\n", 2);
 	
 	// 
-	if (this->d_ptr->transport->sendToRemote (this, chunk)) {
-		return len;
-	}
-	
-	return -1;
+	return this->d_ptr->transport->sendToRemote (this, chunk);
 }
 
 void Nuria::HttpClient::pipeToClientReadyRead () {
-	
-	// If the device is now closed (i.e. not readable), kill the connection
-	if (!this->d_ptr->pipeDevice->isReadable ()) {
-		closeInternal ();
-		return;
-	}
 	
 	// 
 	if (!sendPipeChunkToClient ()) {
@@ -607,8 +672,7 @@ void Nuria::HttpClient::pipeToClientReadyRead () {
 			return;
 		
 		// Disconnect aboutToClose() as it may lead to infinite recursion
-		disconnect (this->d_ptr->pipeDevice, &QIODevice::aboutToClose,
-		            this, &HttpClient::pipeToClientReadyRead);
+		disconnect (this->d_ptr->pipeDevice, 0, this, 0);
 		this->d_ptr->pipeDevice->close ();
 		
 		// Send response header. This is important to do if the user
@@ -713,7 +777,7 @@ bool Nuria::HttpClient::setResponseHeaders (const HeaderMap &headers) {
 }
 
 bool Nuria::HttpClient::pipeToClient (QIODevice *device, qint64 maxlen) {
-	if (!device->isReadable ())
+	if (!device || !device->isReadable ())
 		return false;
 	
 	this->d_ptr->pipeDevice = device;
@@ -732,11 +796,18 @@ bool Nuria::HttpClient::pipeToClient (QIODevice *device, qint64 maxlen) {
 	
 	// If it's a random-access device, we can send a proper Content-Length header.
 	if (!device->isSequential () && !this->d_ptr->headerSent &&
-	    !this->d_ptr->responseHeaders.contains (httpHeaderName (HeaderContentLength))) {
+	    !this->d_ptr->responseHeaders.contains (httpHeaderName (HeaderContentLength)) &&
+	    this->d_ptr->filters.isEmpty ()) {
+		
 		setContentLength (device->size ());
 		
-		// Try to use streaming mode.
-		if (!this->d_ptr->outBuffer && !this->d_ptr->headerSent) {
+	}
+	
+	// Decide on Chunked or Streaming mode
+	if (!this->d_ptr->headerSent && !this->d_ptr->outBuffer) {
+		if (this->d_ptr->connectionMode == ConnectionKeepAlive) {
+			this->d_ptr->transferMode = ChunkedStreaming;
+		} else {
 			this->d_ptr->transferMode = Streaming;
 		}
 		
@@ -834,8 +905,20 @@ void Nuria::HttpClient::close () {
 }
 
 void Nuria::HttpClient::closeInternal () {
+	if (this->d_ptr->connectionClosed) {
+		return;
+	}
+	
+	// 
+	this->d_ptr->connectionClosed = true;
 	setOpenMode (QIODevice::NotOpen);
 	emit aboutToClose ();
+	
+	// 
+	QByteArray data = filterDeinit ();
+	if (!data.isEmpty ()) {
+		sendData (data);
+	}
 	
 	// Indicate end of stream for chunked streaming mode.
 	if (this->d_ptr->transferMode == ChunkedStreaming) {
@@ -845,6 +928,74 @@ void Nuria::HttpClient::closeInternal () {
 	
 	// 
 	this->d_ptr->transport->close (this);
+}
+
+QByteArray Nuria::HttpClient::filterInit () {
+	QByteArray data;
+	
+	for (int i = 0, total = this->d_ptr->filters.length (); i < total; ++i) {
+		HttpFilter *filter = this->d_ptr->filters.at (i);
+		data.append (filter->filterBegin (this));
+	}
+	
+	return data;
+}
+
+QByteArray Nuria::HttpClient::filterDeinit () {
+	QByteArray data;
+	
+	for (int i = 0, total = this->d_ptr->filters.length (); i < total; ++i) {
+		HttpFilter *filter = this->d_ptr->filters.at (i);
+		data.append (filter->filterEnd (this));
+	}
+	
+	return data;
+}
+
+bool Nuria::HttpClient::filterData (QByteArray &data) {
+	for (int i = 0, total = this->d_ptr->filters.length (); i < total; ++i) {
+		HttpFilter *filter = this->d_ptr->filters.at (i);
+		if (!filter->filterData (this, data)) {
+			return false;
+		}
+		
+	}
+	
+	// Done.
+	return true;
+}
+
+bool Nuria::HttpClient::filterHeaders (HeaderMap &headers) {
+	for (int i = 0, total = this->d_ptr->filters.length (); i < total; ++i) {
+		HttpFilter *filter = this->d_ptr->filters.at (i);
+		
+		// 
+		QByteArray name = filter->filterName ();
+		if (!name.isEmpty ()) {
+			addNameToTransferEncoding (headers, name);
+		}
+		
+		// 
+		if (!filter->filterHeaders (this, headers)) {
+			return false;
+		}
+		
+	}
+	
+	// Done.
+	return true;
+}
+
+void Nuria::HttpClient::addNameToTransferEncoding (HeaderMap &headers, const QByteArray &name) {
+	QByteArray value = headers.value (httpHeaderName (HeaderTransferEncoding));
+	if (value.isEmpty ()) {
+		value = name;
+	} else {
+		value.append (", ");
+		value.append (name);
+	}
+	
+	headers.replace (httpHeaderName (HeaderTransferEncoding), value);
 }
 
 void Nuria::HttpClient::forceClose () {
@@ -1114,9 +1265,16 @@ bool Nuria::HttpClient::sendResponseHeader () {
 	writer.applyRangeHeaders (this->d_ptr->rangeStart, this->d_ptr->rangeEnd,
 				  this->d_ptr->contentLength, this->d_ptr->responseHeaders);
 	writer.addComplianceHeaders (this->d_ptr->requestVersion, this->d_ptr->responseHeaders);
-	writer.addTransferEncodingHeader (this->d_ptr->transferMode, this->d_ptr->responseHeaders);
 	writer.addConnectionHeader (this->d_ptr->connectionMode, this->d_ptr->transport->currentRequestCount (),
 	                            this->d_ptr->transport->maxRequests (), this->d_ptr->responseHeaders);
+	
+	// Apply filters
+	if (!filterHeaders (this->d_ptr->responseHeaders)) {
+		return false;
+	}
+	
+	// 
+	writer.addTransferEncodingHeader (this->d_ptr->transferMode, this->d_ptr->responseHeaders);
 	
 	// Construct header data
 	QByteArray header;
@@ -1151,7 +1309,7 @@ bool Nuria::HttpClient::killConnection (int error, const QString &cause) {
 		
 		// 
 		sendResponseHeader ();
-		this->d_ptr->transport->sendToRemote (this, causeData);
+		writeDataInternal (causeData);
 	}
 	
 	// Close connection

@@ -31,6 +31,7 @@ namespace Nuria {
 
 class HttpClientPrivate;
 class HttpTransport;
+class HttpFilter;
 class HttpServer;
 class HttpNode;
 class SlotInfo;
@@ -87,6 +88,29 @@ class SlotInfo;
  * If you want to support requests with 'Range' headers use rangeStart() and
  * rangeEnd() to get the range the client requested. Use setContentLength() to
  * set the length of the \b complete response.
+ * 
+ * \par Compression and filtering
+ * Transparent compression is provided by filters. Filters are small classes
+ * which can hook themselves into the outgoing stream and e.g. compress or
+ * otherwise modify streams and HTTP headers.
+ * 
+ * Filters are invoked in the order they were added, except for those two
+ * "standard" filters, which are always invoked last.
+ * 
+ * Support for "gzip" (RFC 1952) and "deflate" (RFCs 1951, 1950) compressions
+ * schemes are provided by the framework. Custom filters can be written by
+ * sub-classing HttpFilter.
+ * 
+ * \warning You should be aware of the BREACH attack, which targets SSL
+ * encrypted and compressed transmissions. Please see:
+ * http://en.wikipedia.org/wiki/BREACH_%28security_exploit%29
+ * 
+ * \note It is recommended to use "gzip" over "deflate" as deflate has severe
+ * browser compatibility issues.
+ * 
+ * \warning Filters are \b not owned by the HttpClient instance.
+ * 
+ * \sa HttpFilter addFilter removeFilter
  * 
  */
 class NURIA_NETWORK_EXPORT HttpClient : public QIODevice {
@@ -211,13 +235,25 @@ public:
 		ConnectionKeepAlive
 	};
 	
+	/** Enumeration of standard filters. */
+	enum StandardFilter {
+		
+		/** Deflate filter. */
+		DeflateFilter = 0,
+		
+		/** GZIP filter. */
+		GzipFilter = 1
+		
+	};
+	
 	/** Map used to store HTTP headers in a name -> value fashion. */
 	typedef QMultiMap< QByteArray, QByteArray > HeaderMap;
 	
 	/**
 	 * Constructs a new HttpClient instance which uses \a transport as
-	 * communication back-end. Ownership of \a transport is transferred
-	 * to the HttpClient instance.
+	 * communication back-end.
+	 * 
+	 * Ownership of the HttpClient will be transferred to \a transport.
 	 */
 	explicit HttpClient (HttpTransport *transport, HttpServer *server);
 	
@@ -598,6 +634,23 @@ public:
 	bool requestHasPostBody () const;
 	
 	/**
+	 * Adds \a filter to the filter chain. There can only be the
+	 * DeflateFilter or the GzipFilter active at the same time.
+	 * If one is already added before calling this method, it will
+	 * be replaced.
+	 */
+	void addFilter (StandardFilter filter);
+	
+	/** Adds \a filter to the filter chain. */
+	void addFilter (HttpFilter *filter);
+	
+	/** Removes \a filter from the filter chain. */
+	void removeFilter (StandardFilter filter);
+	
+	/** Removes \a filter from the filter chain. */
+	void removeFilter (HttpFilter *filter);
+	
+	/**
 	 * Returns \c true if the POST body has been completely read by the
 	 * user. Also returns \c true if the request has no POST body at all.
 	 * Returns \c false otherwise.
@@ -644,7 +697,6 @@ public slots:
 	bool sendResponseHeader ();
 	
 	/**
-	 * \reimp
 	 * \note close() will make sure that all data that is in the write 
 	 * buffer will be sent to the client before the socket is closed.
 	 * 
@@ -711,7 +763,7 @@ private:
 	void bytesSent (qint64 bytes);
 	void processData (QByteArray &data);
 	
-	qint64 sendChunkedData (const char *data, qint64 len);
+	bool sendChunkedData (const QByteArray &data);
 	qint64 parseIntegerHeaderValue (const QByteArray &value);
 	bool readPostBodyContentLength ();
 	bool send100ContinueIfClientExpectsIt ();
@@ -729,8 +781,14 @@ private:
 	bool contentTypeIsUrlEncoded (const QByteArray &value) const;
 	HttpPostBodyReader *createHttpMultiPartReader (const QByteArray &header);
 	HttpPostBodyReader *createUrlEncodedPartReader (const QByteArray &header);
-	qint64 writeDataInternal (const char *data, qint64 len);
+	qint64 writeDataInternal (QByteArray data);
+	bool sendData (const QByteArray &data);
 	void closeInternal ();
+	QByteArray filterInit ();
+	QByteArray filterDeinit ();
+	bool filterData (QByteArray &data);
+	bool filterHeaders (HeaderMap &headers);
+	void addNameToTransferEncoding (HeaderMap &headers, const QByteArray &name);
 	
 	/**
 	 * Sends a chunk of the pipeToClient() device to the client.

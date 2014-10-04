@@ -68,10 +68,11 @@ struct HttpClientPrivate {
 	
 	// 
 	SlotInfo slotInfo;
+	QVector< HttpFilter * > filters;
 	
 	// 
 	bool keepConnectionOpen = false;
-	
+	bool connectionClosed = false;
 };
 
 class HttpNodePrivate {
