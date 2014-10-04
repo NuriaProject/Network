@@ -40,6 +40,7 @@ public:
 Nuria::HttpTcpTransport::HttpTcpTransport (QTcpSocket *socket, HttpServer *server)
 	: HttpTransport (server), d_ptr (new HttpTcpTransportPrivate)
 {
+	socket->setParent (this);
 	this->d_ptr->server = server;
 	this->d_ptr->socket = socket;
 	this->d_ptr->sslSocket = qobject_cast< QSslSocket * > (socket);

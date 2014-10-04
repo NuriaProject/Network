@@ -180,8 +180,6 @@ void Nuria::HttpServer::newClient () {
 		QTcpSocket *socket = server->nextPendingConnection ();
 		HttpTcpTransport *transport = new HttpTcpTransport (socket, this);
 		Q_UNUSED(transport)
-//		HttpClient *client = new HttpClient (transport, this);
-//		Q_UNUSED(client)
 		
 	}
 	
