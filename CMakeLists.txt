@@ -5,6 +5,8 @@ cmake_minimum_required(VERSION 2.8.8)
 # Base configuration
 PROJECT(NuriaNetwork)
 
+cmake_policy(SET CMP0020 NEW)
+
 # Enable moc
 SET(CMAKE_AUTOMOC ON)
 SET(CMAKE_INCLUDE_CURRENT_DIR ON)
@@ -49,9 +51,6 @@ SET(NuriaNetwork_SRC
     src/private/adler32.h
 )
 
-# 
-add_definitions(-DNURIA_NETWORK_LIBRARY)
-
 # Create build target
 ADD_LIBRARY(NuriaNetwork SHARED ${NuriaNetwork_SRC})
 target_link_libraries(NuriaNetwork NuriaCore)
@@ -64,17 +63,25 @@ set_target_properties(
     SOVERSION ${NURIA_SOVERSION}
 )
 
+# Add public include directories to target
+set_property(TARGET NuriaNetwork APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+  $<INSTALL_INTERFACE:include>
+)
+
 # Install target
-INSTALL(TARGETS NuriaNetwork 
+INSTALL(TARGETS NuriaNetwork EXPORT NuriaNetworkConfig
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
-        RUNTIME DESTINATION lib
+        RUNTIME DESTINATION bin
 )
 
 INSTALL(DIRECTORY src/nuria/ DESTINATION include/nuria
         FILES_MATCHING PATTERN "*.hpp"
         PATTERN "private" EXCLUDE
 )
+
+INSTALL(EXPORT NuriaNetworkConfig DESTINATION lib/cmake/NuriaNetwork)
 
 # Add Tests
 enable_testing()
