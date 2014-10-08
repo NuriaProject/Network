@@ -112,10 +112,47 @@ private:
 typedef QList< HttpNode * > HttpNodeList;
 
 /**
- * @brief The HttpNode class represents a virtual directory (or a virtual file)
- * HttpServer uses these nodes to call the correct method.
- * Use connectSlot() to connect a resource to a slot.
- * You can host static resources by using setStaticResourceDir.
+ * \brief Virtual directory for HttpServer
+ * 
+ * A node is the equivalent to a directory of other HTTP servers and provides
+ * a hierarchical system to manage resources. They may contain other nodes or
+ * slots, all of which are named.
+ * 
+ * Slots may be invokable Callback's or static files.
+ * 
+ * \par Usage
+ * 
+ * To add a node as child node, just call addNode(). This will make the node
+ * available to HTTP requests. If you want to invoke a C++ function when a
+ * certain path was requested, use connectSlot(), which accepts a
+ * Nuria::Callback and will work with any callback of this sort.
+ * 
+ * \note Slots are only invoked if it's the last element in the requested path.
+ * 
+ * For example, if you have a slot called "foo", it will \b only be called,
+ * if "foo" is at the end of the path, like "/stuff/foo". It won't be invoked
+ * if the request path would be "/foo/stuff".
+ * 
+ * \note It's possible to have a child node and a slot with the same name in a
+ * single HttpNode instance.
+ * 
+ * It's also possible to easily serve static files from the file-system. See
+ * setStaticResourceDir() and setStaticResourceMode() for more information.
+ * 
+ * \par How a path is invoked
+ * 
+ * Nodes are hierarchical, meaning you can put nodes into other nodes to build
+ * paths. When a HTTP request was made and the request header has been parsed,
+ * the HttpClient instance will try to "invoke" the path. It does this by
+ * calling invokePath() on the HttpServer's root node. The root node will, in
+ * the default implementation, look for a matching slot if it's at the last
+ * part of the path, or else, try to find a child node with a matching name,
+ * which if found will be invoked recursively.
+ * 
+ * Other HttpNode implementations may change this behaviour significantly by
+ * re-implementing invokePath(). RestfulHttpNode is a good example, which allows
+ * to write RESTful services easily by parsing the requested path for variables
+ * passed to the call.
  * 
  * \par Advanced usage
  * 

@@ -33,9 +33,17 @@ class SslServer;
 class HttpNode;
 
 /**
- * @brief The HttpServer class provides a simple HTTP server.
- * This server is directed at providing interactive content, but
- * it also may serve static content.
+ * \brief TCP/SSL Server for the HyperText Transfer Protocol
+ * 
+ * This is a implementation of a server for HTTP. The server class itself
+ * is responsible for managing the "root node" (The equivalent to the document
+ * root in other HTTP servers) and for accepting new connections.
+ * 
+ * Please see HttpNode and HttpClient
+ * 
+ * \note For redirections to work properly, you should set the fully qualified
+ * domain name of the server using setFqdn().
+ * 
  */
 class NURIA_NETWORK_EXPORT HttpServer : public QObject {
 	Q_OBJECT
