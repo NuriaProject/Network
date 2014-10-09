@@ -246,6 +246,24 @@ public:
 		
 	};
 	
+	/**
+	 * Modes which decide to which specific URL the client is redirected to.
+	 */
+	enum class RedirectMode {
+		
+		/**
+		 * Don't change the protocol encryption.
+		 * Keeps the secure or unsecure connection.
+		 */
+		Keep = 0,
+		
+		/** Redirect the client to the SSL secured path. */
+		ForceSecure,
+		
+		/** Redirect the client to the unsecured path. */
+		ForceUnsecure
+	};
+	
 	/** Map used to store HTTP headers in a name -> value fashion. */
 	typedef QMultiMap< QByteArray, QByteArray > HeaderMap;
 	
@@ -651,6 +669,32 @@ public:
 	void removeFilter (HttpFilter *filter);
 	
 	/**
+	 * Sends a HTTP redirect response, telling the client to go to
+	 * \a localPath. Returns \c true if no headers has been sent yet.
+	 * 
+	 * Use this version of this function when you're redirecting to a URL
+	 * which is served by this server.
+	 * 
+	 * For redirections to work properly, the Nuria::Server instance must
+	 * have been told the FQDN ("fully qualified domain name").
+	 * 
+	 * \note HTTP/1.0 clients will receive a status code of 301 instead of
+	 * 307.
+	 */
+	bool redirectClient (const QString &localPath, RedirectMode mode = RedirectMode::Keep,
+	                     int statusCode = 307);
+	
+	/**
+	 * Sends a HTTP redirect response, telling the client to go to
+	 * \a remoteUrl. This should only be used for URLs not served by this
+	 * server. Returns \c true if no headers has been sent yet.
+	 * 
+         * \note HTTP/1.0 clients will receive a status code of 301 instead of
+         * 307.
+	 */
+	bool redirectClient (const QUrl &remoteUrl, int statusCode = 307);
+	
+	/**
 	 * Returns \c true if the POST body has been completely read by the
 	 * user. Also returns \c true if the request has no POST body at all.
 	 * Returns \c false otherwise.
@@ -759,6 +803,9 @@ private:
 	 * here.
 	 */
 	void readRequestCookies ();
+	
+	bool sendRedirectResponse (const QByteArray &location, const QByteArray &display, int code);
+	void updateRequestedUrl ();
 	
 	void bytesSent (qint64 bytes);
 	void processData (QByteArray &data);

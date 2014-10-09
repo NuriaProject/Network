@@ -30,6 +30,7 @@ class HttpMemoryTransport : public HttpTransport {
 	Q_OBJECT
 public:
 	QByteArray outData;
+	bool secure = false;
 	
 	/** Constructor. */
 	explicit HttpMemoryTransport (QObject *parent = 0);
@@ -39,6 +40,9 @@ public:
 		setCurrentRequestCount (currentRequestCount () + 1);
 		return data;
 	}
+	
+	bool isSecure () const
+	{ return secure; }
 	
 	// 
 	bool isOpen () const;

@@ -356,7 +356,7 @@ bool Nuria::HttpNode::callSlotByName (const QString &name, HttpClient *client) {
 	
 	// Is encryption enforced?
 	if (info.forceEncrypted () && !client->isConnectionSecure ()) {
-		client->httpServer ()->redirectClientToUseEncryption (client);
+		client->redirectClient (client->path ().path (), HttpClient::RedirectMode::ForceSecure);
 		return false;
 	}
 	

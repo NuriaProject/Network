@@ -24,7 +24,8 @@
 #include <QTimer>
 #include <QDir>
 
-// We need gmtime_r
+// We need gmtime_r and snprintf
+#include <cstring>
 #include <ctime>
 
 #include <nuria/temporarybufferdevice.hpp>
@@ -91,6 +92,72 @@ void Nuria::HttpClient::readRequestCookies () {
 			nError() << "Failed to parse cookies" << data;
 			this->d_ptr->requestCookies.clear ();
 			return;
+		}
+		
+	}
+	
+}
+
+static QByteArray redirectMessage (const QByteArray &location, const QByteArray &display) {
+	QByteArray msg = QByteArrayLiteral("Redirecting to <a href=\"");
+	msg.append (location);
+	msg.append ("\">");
+	msg.append (display);
+	msg.append ("</a>");
+	
+	return msg;
+}
+
+bool Nuria::HttpClient::sendRedirectResponse (const QByteArray &location, const QByteArray &display, int code) {
+	if (this->d_ptr->headerSent) {
+		return false;
+	}
+	
+	// Rewrite 307 to 301 for HTTP/1.0 clients (307 was introduced in HTTP/1.1)
+	if (this->d_ptr->requestVersion == Http1_0 && code == 307) {
+		code = 301;
+	}
+	
+	// Set response headers
+	this->d_ptr->responseCode = code;
+	this->d_ptr->responseHeaders.replace (httpHeaderName (HeaderLocation), location);
+	
+	// Write short redirect message if this is not a HEAD request
+	if (this->d_ptr->requestType != HEAD) {
+		QByteArray message = redirectMessage (location, display);
+		return (writeData (message.constData (), message.length ()) > 0);
+	}
+	
+	// HEAD request, only make sure that the response header is sent.
+	return sendResponseHeader ();	
+}
+
+void Nuria::HttpClient::updateRequestedUrl () {
+	QByteArray host = this->d_ptr->requestHeaders.value (httpHeaderName (HeaderHost));
+	
+	// Host header set, add it to the requested URL.
+	if (!host.isEmpty ()) {
+		QString hostName = QString::fromLatin1 (host);
+		int portIdx = hostName.indexOf (QLatin1Char (':'));
+		
+		// Read port part
+		if (portIdx > 0) {
+			int port = hostName.midRef (portIdx + 1).toInt ();
+			hostName.chop (hostName.length () - portIdx);
+			this->d_ptr->path.setPort (port);
+		}
+		
+		// Set hostname
+		this->d_ptr->path.setHost (hostName);
+	} else {
+		// Set hostname and port by server configuration
+		this->d_ptr->path.setHost (this->d_ptr->server->fqdn ());
+		bool secure = this->d_ptr->transport->isSecure ();
+		int usedPort = (!secure) ? this->d_ptr->server->port () : this->d_ptr->server->securePort ();
+		
+		// Set non-standard port
+		if ((secure && usedPort != 443) || (!secure && usedPort != 80)) {
+			this->d_ptr->path.setPort (usedPort);
 		}
 		
 	}
@@ -245,9 +312,14 @@ bool Nuria::HttpClient::readFirstLine (const QByteArray &line) {
 					     path, this->d_ptr->requestVersion);
 	
 	// 
-	path.prepend ("http://localhost");
-	this->d_ptr->path = QUrl::fromEncoded (path);
+	if (this->d_ptr->transport->isSecure ()) {
+		path.prepend ("https://localhost");
+	} else {
+		path.prepend ("http://localhost");
+	}
 	
+	// 
+	this->d_ptr->path = QUrl::fromEncoded (path);
 	return success;
 }
 
@@ -305,6 +377,7 @@ bool Nuria::HttpClient::verifyCompleteHeader () {
 	}
 	
 	// 
+	updateRequestedUrl ();
 	return true;
 }
 
@@ -369,6 +442,59 @@ void Nuria::HttpClient::removeFilter (HttpFilter *filter) {
 		this->d_ptr->filters.remove (idx);
 	}
 	
+}
+
+static QByteArray relativePathToAbsolute (const QString &localPath) {
+	QByteArray path = localPath.toLatin1 ();
+	
+	if (!localPath.startsWith (QLatin1Char ('/'))) {
+		path.prepend ('/');
+	}
+	
+	// 
+	return path;
+}
+
+static QUrl redirectionSchemeUrl (const QString &localPath, bool toSecure, Nuria::HttpClientPrivate *d_ptr) {
+	static const QString http = QStringLiteral("http");
+	static const QString https = QStringLiteral("https");
+	
+	bool isSecure = d_ptr->transport->isSecure ();
+	int port = (toSecure) ? d_ptr->server->securePort () : d_ptr->server->port ();
+	QUrl url = d_ptr->path;
+	
+	// Set non-standard port
+	if ((toSecure && !isSecure && port != 443) ||
+	    (!toSecure && isSecure && port != 80)) {
+		url.setPort (port);
+		url.setScheme (toSecure ? https : http);
+	}
+	
+	// Set scheme and path
+	url.setPath (localPath);
+	return url;
+}
+
+bool Nuria::HttpClient::redirectClient (const QString &localPath, RedirectMode mode, int statusCode) {
+	QByteArray url;
+	
+	// Transform URL
+	switch (mode) {
+	case RedirectMode::Keep:
+		url = relativePathToAbsolute (localPath);
+		break;
+	case RedirectMode::ForceSecure:
+	case RedirectMode::ForceUnsecure:
+		url = redirectionSchemeUrl (localPath, (mode == RedirectMode::ForceSecure), this->d_ptr).toEncoded ();
+		break;
+	}
+	
+	// Redirect
+	return sendRedirectResponse (url, localPath.toUtf8 (), statusCode);
+}
+
+bool Nuria::HttpClient::redirectClient (const QUrl &remoteUrl, int statusCode) {
+	return sendRedirectResponse (remoteUrl.toEncoded (), remoteUrl.toDisplayString ().toUtf8 (), statusCode);
 }
 
 bool Nuria::HttpClient::postProcessRequestHeader () {

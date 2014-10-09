@@ -139,12 +139,6 @@ private:
 	 */
 	bool invokeByPath (HttpClient *client, const QString &path);
 	
-	/**
-	 * Internal function used to redirect the client to the
-	 * secure port.
-	 */
-	void redirectClientToUseEncryption (HttpClient *client);
-	
 	// 
 	HttpServerPrivate *d_ptr;
 	

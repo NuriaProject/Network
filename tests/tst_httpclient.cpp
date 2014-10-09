@@ -181,6 +181,21 @@ bool TestNode::invokePath (const QString &path, const QStringList &parts,
 		client->addFilter (new RotFilter (client));
 		client->write ("abcdef");
 		
+	} else if (path == "/redirect/keep") {
+		client->redirectClient ("/nuria", HttpClient::RedirectMode::Keep);
+		
+	} else if (path == "/redirect/http") {
+		client->redirectClient ("/nuria", HttpClient::RedirectMode::ForceUnsecure);
+		
+	} else if (path == "/redirect/https") {
+		client->redirectClient ("/nuria", HttpClient::RedirectMode::ForceSecure);
+		
+	} else if (path == "/redirect/302") {
+		client->redirectClient ("/nuria", HttpClient::RedirectMode::Keep, 302);
+		
+	} else if (path == "/redirect/remote") {
+		client->redirectClient (QUrl ("http://nuriaproject.org/"));
+		
 	} else {
 		qDebug("%s", qPrintable(path));
 		client->write (path.toLatin1 ());
@@ -219,6 +234,14 @@ private slots:
 	void verifyGzipFilter ();
 	void verifyDeflateFilter ();
 	
+	void verifyClientPath_data ();
+	void verifyClientPath ();
+	
+	void redirectClientLocal_data ();
+	void redirectClientLocal ();
+	void redirectClientLocalCustomResponseCode ();
+	void redirectClientRemote ();
+	
 private:
 	
 	HttpClient *createClient (const QByteArray &request) {
@@ -241,6 +264,7 @@ private:
 
 void HttpClientTest::initTestCase () {
 	server->setRoot (node);
+	server->setFqdn ("unit.test");
 }
 
 void HttpClientTest::getHttp10 () {
@@ -660,6 +684,158 @@ void HttpClientTest::verifyDeflateFilter () {
 	                           "\x28\xca\xcf\x4a\x4d\x2e\x01\x00"
 	                           "\x1f\x00\x04\xd7";
 	QByteArray expected (data, sizeof(data) - 1);
+	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
+	HttpClient *client = createClient (input);
+	HttpMemoryTransport *transport = getTransport (client);
+	
+	QCOMPARE(transport->outData, expected);
+}
+
+void HttpClientTest::verifyClientPath_data () {
+	QTest::addColumn< QString > ("host");
+	QTest::addColumn< bool > ("secure");
+	QTest::addColumn< QString > ("url");
+	
+	QTest::newRow ("http") << "foo.bar" << false << "http://foo.bar/nuria";
+	QTest::newRow ("https") << "foo.bar" << true << "https://foo.bar/nuria";
+	QTest::newRow ("http:81") << "foo.bar:81" << false << "http://foo.bar:81/nuria";
+	QTest::newRow ("https:444") << "foo.bar:444" << true << "https://foo.bar:444/nuria";
+	QTest::newRow ("http1.0") << "" << false << "http://unit.test/nuria";
+	QTest::newRow ("https1.0") << "" << true << "https://unit.test/nuria";
+//	QTest::newRow ("http1.0:81") << "" << 81 << false << "http://unit.test:81/nuria";
+//	QTest::newRow ("https1.0:444") << "" << 444 << true << "https://unit.test:444/nuria";
+}
+
+void HttpClientTest::verifyClientPath () {
+	QFETCH(QString, host);
+	QFETCH(bool, secure);
+	QFETCH(QString, url);
+	
+	// Build HTTP request
+	QByteArray input = "GET /nuria HTTP/1.0\r\n";
+	if (!host.isEmpty ()) {
+		input.append ("Host: ");
+		input.append (host);
+		input.append ("\r\n");
+	}
+	
+	input.append ("\r\n");
+	
+	//
+	QTest::ignoreMessage (QtDebugMsg, "/nuria");
+	QTest::ignoreMessage (QtDebugMsg, "close()");
+	
+	// 
+	HttpMemoryTransport *transport = new HttpMemoryTransport (this);
+	HttpClient *client = new HttpClient (transport, server);
+	transport->secure = secure;
+	transport->process (client, input);
+	
+	// 
+	QCOMPARE(client->path ().toString (), url);
+	
+}
+
+void HttpClientTest::redirectClientLocal_data () {
+	QTest::addColumn< QString > ("host");
+	QTest::addColumn< bool > ("secure");
+	QTest::addColumn< QString > ("mode");
+	QTest::addColumn< QString > ("location");
+	QTest::addColumn< int > ("code");
+	
+	// RedirectMode::Keep
+	QTest::newRow ("http keep") << "foo.bar" << false << "keep" << "/nuria" << 307;
+	QTest::newRow ("https keep") << "foo.bar" << true << "keep" << "/nuria" << 307;
+	QTest::newRow ("http:81 keep") << "foo.bar:81" << false << "keep" << "/nuria" << 307;
+	QTest::newRow ("https:444 keep") << "foo.bar:444" << true << "keep" << "/nuria" << 307;
+	QTest::newRow ("http1.0 keep") << "" << false << "keep" << "/nuria" << 301;
+	QTest::newRow ("https1.0 keep") << "" << true << "keep" << "/nuria" << 301;
+	
+	// RedirectMode::ForceUnsecure
+	QTest::newRow ("http unsecure") << "foo.bar" << false << "http" << "http://foo.bar/nuria" << 307;
+	QTest::newRow ("https unsecure") << "foo.bar" << true << "http" << "http://foo.bar/nuria" << 307;
+	QTest::newRow ("http:81 unsecure") << "foo.bar:81" << false << "http" << "http://foo.bar:81/nuria" << 307;
+	QTest::newRow ("https:444 unsecure") << "foo.bar:444" << true << "http" << "http://foo.bar/nuria" << 307;
+	QTest::newRow ("http1.0 unsecure") << "" << false << "http" << "http://unit.test/nuria" << 301;
+	QTest::newRow ("https1.0 unsecure") << "" << true << "http" << "http://unit.test/nuria" << 301;
+	
+	
+	// RedirectMode::ForceSecure
+	QTest::newRow ("http secure") << "foo.bar" << false << "https" << "https://foo.bar/nuria" << 307;
+	QTest::newRow ("https secure") << "foo.bar" << true << "https" << "https://foo.bar/nuria" << 307;
+	QTest::newRow ("http:81 secure") << "foo.bar:81" << false << "https" << "https://foo.bar/nuria" << 307;
+	QTest::newRow ("https:444 secure") << "foo.bar:444" << true << "https" << "https://foo.bar:444/nuria" << 307;
+	QTest::newRow ("http1.0 secure") << "" << false << "https" << "https://unit.test/nuria" << 301;
+	QTest::newRow ("https1.0 secure") << "" << true << "https" << "https://unit.test/nuria" << 301;
+	
+}
+
+void HttpClientTest::redirectClientLocal () {
+	QFETCH(QString, host);
+	QFETCH(bool, secure);
+	QFETCH(QString, mode);
+	QFETCH(QString, location);
+	QFETCH(int, code);
+	
+	// 
+	if (!host.isEmpty ()) {
+		host.prepend ("Host: ");
+		host.append ("\r\n");
+	}
+	
+	// Build HTTP request
+	static const QString templ = "GET /redirect/%1 HTTP/1.%2\r\n%3\r\n";
+	QString input = templ.arg (mode, QString ((host.isEmpty ()) ? "0" : "1"), host);
+	
+	//
+	QTest::ignoreMessage (QtDebugMsg, "close()");
+	
+	// 
+	HttpMemoryTransport *transport = new HttpMemoryTransport (this);
+	HttpClient *client = new HttpClient (transport, server);
+	transport->secure = secure;
+	transport->process (client, input.toLatin1 ());
+	
+	// 
+	static const QRegularExpression locationRx ("Location: ([^\r]*)\r\n");
+	static const QRegularExpression codeRx ("HTTP/1.[10] ([^ ]*)");
+	QRegularExpressionMatch loc = locationRx.match (transport->outData);
+	QRegularExpressionMatch response = codeRx.match (transport->outData);
+	
+	// 
+	if (!loc.hasMatch ()) QFAIL("No 'Location' header");
+	if (!response.hasMatch ()) QFAIL("No response code");
+	if (loc.captured (1) != location) {
+		qWarning() << "Expected:" << location;
+		qWarning() << "Result  :" << loc.captured (1);
+		QFAIL("Location header URL is different.");
+	}
+	
+	if (response.captured (1).toInt () != code) {
+		qWarning() << "Expected:" << code;
+		qWarning() << "Result  :" << response.captured (1);
+		QFAIL("HTTP response code is different.");
+	}
+	
+}
+
+void HttpClientTest::redirectClientLocalCustomResponseCode () {
+	QByteArray input = "GET /redirect/302 HTTP/1.0\r\n\r\n";
+	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
+	HttpClient *client = createClient (input);
+	
+	QCOMPARE(client->responseCode (), 302);
+}
+
+void HttpClientTest::redirectClientRemote () {
+	QByteArray input = "GET /redirect/remote HTTP/1.0\r\n\r\n";
+	QByteArray expected = "HTTP/1.0 301 Moved Permanently\r\n"
+	                      "Connection: close\r\n"
+	                      "Content-Length: 78\r\n"
+	                      "Location: http://nuriaproject.org/\r\n\r\n"
+	                      "Redirecting to <a href=\"http://nuriaproject.org/\">http://nuriaproject.org/</a>";
 	
 	QTest::ignoreMessage (QtDebugMsg, "close()");
 	HttpClient *client = createClient (input);
