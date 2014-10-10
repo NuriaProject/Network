@@ -28,21 +28,33 @@ class QTcpServer;
 
 namespace Nuria {
 class HttpServerPrivate;
+class HttpTransport;
+class HttpBackend;
 class HttpClient;
-class SslServer;
 class HttpNode;
 
 /**
- * \brief TCP/SSL Server for the HyperText Transfer Protocol
+ * \brief Server for the HyperText Transfer Protocol
  * 
  * This is a implementation of a server for HTTP. The server class itself
  * is responsible for managing the "root node" (The equivalent to the document
- * root in other HTTP servers) and for accepting new connections.
+ * root in other HTTP servers).
  * 
  * Please see HttpNode and HttpClient
  * 
  * \note For redirections to work properly, you should set the fully qualified
  * domain name of the server using setFqdn().
+ * 
+ * \par Usage
+ * After creating an instance of HttpServer, you can change the node hierarchy
+ * using root() or set your own using setRoot(). After that, you'll want to
+ * start listening. For TCP, there's listen() and for SSL there's
+ * listenSecure().
+ * 
+ * \note A single HttpServer can listen on multiple back-ends (TCP, SSL, ...)
+ * at the same time.
+ * 
+ * Please see HttpNode for further information.
  * 
  */
 class NURIA_NETWORK_EXPORT HttpServer : public QObject {
@@ -50,11 +62,10 @@ class NURIA_NETWORK_EXPORT HttpServer : public QObject {
 public:
 	
 	/**
-	 * Constructor. If you pass \c false for \a supportSsl, the HTTP server
-	 * won't support SSL connections.
+	 * Constructor.
 	 * \sa listen listenSecure
 	 */
-	HttpServer (bool supportSsl = true, QObject *parent = 0);
+	HttpServer (QObject *parent = 0);
 	
 	/** Destructor. */
 	~HttpServer ();
@@ -69,67 +80,45 @@ public:
 	void setRoot (HttpNode *node);
 	
 	/**
-	 * Starts the HTTP server.
+	 * Adds a TCP server, listening on \a interface and \a port.
 	 * Returns \c true on success.
 	 */
 	bool listen (const QHostAddress &interface = QHostAddress::Any, quint16 port = 80);
 	
 	/**
-	 * Lets the HTTP server listen on a SSL encrypted port.
+	 * Adds a SSL server, listening on \a interface and \a port.
 	 * Returns \c on success.
-	 * \note For this to work you have to pass \c true for
-	 * the \a supportSsl parameter in the constructor!
 	 */
-	bool listenSecure (const QHostAddress &interface = QHostAddress::Any, quint16 port = 443);
-	
-	/** Returns the local SSL certificate. \sa setLocalCertificate */
-	QSslCertificate localCertificate () const;
-	
-	/** Returns the SSL private key. \sa setPrivateKey */
-	QSslKey privateKey () const;
+	bool listenSecure (const QSslCertificate &certificate, const QSslKey &privateKey,
+	                   const QHostAddress &interface = QHostAddress::Any, quint16 port = 443);
 	
 	/**
 	 * Returns the fully-qualified domain name of this server.
 	 * \sa setFqdn
 	 */
-	const QString &fqdn () const;
-	
-	/**
-	 * Sets the local SSL certificate. \b Needed if you want to use SSL encryption.
-	 * \sa setPrivateKey
-	 */
-	void setLocalCertificate (const QSslCertificate &cert);
-	
-	/**
-	 * Sets the SSL private key. \b Needed if you want to use SSL encryption.
-	 * \sa setLocalCertificate
-	 */
-	void setPrivateKey (const QSslKey &key);
-	
-	/**
-	 * Returns the HTTP port the server is listening on.
-	 * If the server isn't listening \c -1 is returned.
-	 */
-	int port () const;
-	
-	/**
-	 * Returns the HTTPS port the server is listening on.
-	 * If the server isn't listening \c -1 is returned.
-	 */
-	int securePort () const;
+	QString fqdn () const;
 	
 	/**
 	 * Sets the fully-qualified domain name of this server.
-	 * The server will fall-back using the 'Host' header value from
-	 * clients if no value is set (default).
 	 */
 	void setFqdn (const QString &fqdn);
 	
-private slots:
+	/**
+	 * Adds \a server to the list of back-ends. Use this when you write a
+	 * server implementation. Ownership of \a server is transferred to the
+	 * HttpServer.
+	 */
+	void addBackend (HttpBackend *backend);
 	
-	void newClient ();
+	/** Returns a list of currently installed back-ends. */
+	QVector< HttpBackend * > backends () const;
+	
+	/** Removes the back-end which is listening on \a port. */
+	void stopListening (int port);
+	
 	
 private:
+	friend class HttpTransport;
 	friend class HttpClient;
 	friend class HttpNode;
 	
@@ -138,6 +127,8 @@ private:
 	 * by the \a path. Returns \a true on success.
 	 */
 	bool invokeByPath (HttpClient *client, const QString &path);
+	bool addQTcpServerBackend (QTcpServer *server, const QHostAddress &interface, quint16 port);
+	void addTransport (HttpTransport *transport);
 	
 	// 
 	HttpServerPrivate *d_ptr;

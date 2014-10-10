@@ -245,7 +245,7 @@ private slots:
 private:
 	
 	HttpClient *createClient (const QByteArray &request) {
-		HttpMemoryTransport *transport = new HttpMemoryTransport (this);
+		HttpMemoryTransport *transport = new HttpMemoryTransport (server);
 		HttpClient *client = new HttpClient (transport, server);
 		transport->setMaxRequests (1);
 		transport->process (client, request);
@@ -265,6 +265,9 @@ private:
 void HttpClientTest::initTestCase () {
 	server->setRoot (node);
 	server->setFqdn ("unit.test");
+	
+	server->addBackend (new TestBackend (server, 80, false));
+	server->addBackend (new TestBackend (server, 443, true));
 }
 
 void HttpClientTest::getHttp10 () {
@@ -622,7 +625,7 @@ void HttpClientTest::verifyKeepAliveBehaviour () {
 	                      "default";
 	
 	// 
-	HttpMemoryTransport *transport = new HttpMemoryTransport (this);
+	HttpMemoryTransport *transport = new HttpMemoryTransport (server);
 	HttpClient *clientA = new HttpClient (transport, server);
 	HttpClient *clientB = new HttpClient (transport, server);
 	
@@ -727,7 +730,8 @@ void HttpClientTest::verifyClientPath () {
 	QTest::ignoreMessage (QtDebugMsg, "close()");
 	
 	// 
-	HttpMemoryTransport *transport = new HttpMemoryTransport (this);
+	HttpMemoryTransport *transport = new HttpMemoryTransport (server);
+	transport->testBackend->listenPort = (secure) ? 443 : 80;
 	HttpClient *client = new HttpClient (transport, server);
 	transport->secure = secure;
 	transport->process (client, input);
@@ -739,40 +743,48 @@ void HttpClientTest::verifyClientPath () {
 
 void HttpClientTest::redirectClientLocal_data () {
 	QTest::addColumn< QString > ("host");
+	QTest::addColumn< int > ("port");
 	QTest::addColumn< bool > ("secure");
 	QTest::addColumn< QString > ("mode");
 	QTest::addColumn< QString > ("location");
 	QTest::addColumn< int > ("code");
 	
 	// RedirectMode::Keep
-	QTest::newRow ("http keep") << "foo.bar" << false << "keep" << "/nuria" << 307;
-	QTest::newRow ("https keep") << "foo.bar" << true << "keep" << "/nuria" << 307;
-	QTest::newRow ("http:81 keep") << "foo.bar:81" << false << "keep" << "/nuria" << 307;
-	QTest::newRow ("https:444 keep") << "foo.bar:444" << true << "keep" << "/nuria" << 307;
-	QTest::newRow ("http1.0 keep") << "" << false << "keep" << "/nuria" << 301;
-	QTest::newRow ("https1.0 keep") << "" << true << "keep" << "/nuria" << 301;
+	QTest::newRow ("http keep") << "foo.bar" << 80 << false << "keep" << "/nuria" << 307;
+	QTest::newRow ("https keep") << "foo.bar" << 443 << true << "keep" << "/nuria" << 307;
+	QTest::newRow ("http:81 keep") << "foo.bar:81" << 80 << false << "keep" << "/nuria" << 307;
+	QTest::newRow ("https:444 keep") << "foo.bar:444" << 443 << true << "keep" << "/nuria" << 307;
+	QTest::newRow ("http1.0 keep") << "" << 80 << false << "keep" << "/nuria" << 301;
+	QTest::newRow ("https1.0 keep") << "" << 443 << true << "keep" << "/nuria" << 301;
+	QTest::newRow ("http1.0:81 keep") << "" << 81 << false << "keep" << "/nuria" << 301;
+	QTest::newRow ("https1.0:444 keep") << "" << 444 << true << "keep" << "/nuria" << 301;
 	
 	// RedirectMode::ForceUnsecure
-	QTest::newRow ("http unsecure") << "foo.bar" << false << "http" << "http://foo.bar/nuria" << 307;
-	QTest::newRow ("https unsecure") << "foo.bar" << true << "http" << "http://foo.bar/nuria" << 307;
-	QTest::newRow ("http:81 unsecure") << "foo.bar:81" << false << "http" << "http://foo.bar:81/nuria" << 307;
-	QTest::newRow ("https:444 unsecure") << "foo.bar:444" << true << "http" << "http://foo.bar/nuria" << 307;
-	QTest::newRow ("http1.0 unsecure") << "" << false << "http" << "http://unit.test/nuria" << 301;
-	QTest::newRow ("https1.0 unsecure") << "" << true << "http" << "http://unit.test/nuria" << 301;
-	
+	QTest::newRow ("http unsecure") << "foo.bar" << 80 << false << "http" << "http://foo.bar/nuria" << 307;
+	QTest::newRow ("https unsecure") << "foo.bar" << 443 << true << "http" << "http://foo.bar/nuria" << 307;
+	QTest::newRow ("http:81 unsecure") << "foo.bar:81" << 80 << false << "http" << "http://foo.bar:81/nuria" << 307;
+	QTest::newRow ("https:444 unsecure") << "foo.bar:444" << 443 << true << "http" << "http://foo.bar/nuria" << 307;
+	QTest::newRow ("http1.0 unsecure") << "" << 80 << false << "http" << "http://unit.test/nuria" << 301;
+	QTest::newRow ("https1.0 unsecure") << "" << 443 << true << "http" << "http://unit.test/nuria" << 301;
+	QTest::newRow ("http1.0:81 unsecure") << "" << 81 << false << "http" << "http://unit.test:81/nuria" << 301;
+	QTest::newRow ("https1.0:444 unsecure") << "" << 444 << true << "http" << "http://unit.test/nuria" << 301;
 	
 	// RedirectMode::ForceSecure
-	QTest::newRow ("http secure") << "foo.bar" << false << "https" << "https://foo.bar/nuria" << 307;
-	QTest::newRow ("https secure") << "foo.bar" << true << "https" << "https://foo.bar/nuria" << 307;
-	QTest::newRow ("http:81 secure") << "foo.bar:81" << false << "https" << "https://foo.bar/nuria" << 307;
-	QTest::newRow ("https:444 secure") << "foo.bar:444" << true << "https" << "https://foo.bar:444/nuria" << 307;
-	QTest::newRow ("http1.0 secure") << "" << false << "https" << "https://unit.test/nuria" << 301;
-	QTest::newRow ("https1.0 secure") << "" << true << "https" << "https://unit.test/nuria" << 301;
+	QTest::newRow ("http secure") << "foo.bar" << 80 << false << "https" << "https://foo.bar/nuria" << 307;
+	QTest::newRow ("https secure") << "foo.bar" << 443 << true << "https" << "https://foo.bar/nuria" << 307;
+	QTest::newRow ("http:81 secure") << "foo.bar:81" << 80 << false << "https" << "https://foo.bar/nuria" << 307;
+	QTest::newRow ("https:444 secure") << "foo.bar:444" << 443 << true
+	                                   << "https" << "https://foo.bar:444/nuria" << 307;
+	QTest::newRow ("http1.0 secure") << "" << 80 << false << "https" << "https://unit.test/nuria" << 301;
+	QTest::newRow ("https1.0 secure") << "" << 443 << true << "https" << "https://unit.test/nuria" << 301;
+	QTest::newRow ("http1.0:81 secure") << "" << 81 << false << "https" << "https://unit.test/nuria" << 301;
+        QTest::newRow ("https1.0:444 secure") << "" << 444 << true << "https" << "https://unit.test:444/nuria" << 301;
 	
 }
 
 void HttpClientTest::redirectClientLocal () {
 	QFETCH(QString, host);
+	QFETCH(int, port);
 	QFETCH(bool, secure);
 	QFETCH(QString, mode);
 	QFETCH(QString, location);
@@ -792,8 +804,20 @@ void HttpClientTest::redirectClientLocal () {
 	QTest::ignoreMessage (QtDebugMsg, "close()");
 	
 	// 
-	HttpMemoryTransport *transport = new HttpMemoryTransport (this);
-	HttpClient *client = new HttpClient (transport, server);
+	HttpServer server;
+	server.setRoot (this->node);
+	server.setFqdn (this->server->fqdn ());
+	this->node->setParent (this->server);
+	
+	// Only used when switching secure <-> unsecure
+	server.addBackend (new TestBackend (&server, (!secure) ? 443 : 80, !secure));
+	server.addBackend (new TestBackend (&server, port, secure));
+	
+	// 
+	HttpMemoryTransport *transport = new HttpMemoryTransport (&server);
+	HttpClient *client = new HttpClient (transport, &server);
+	transport->testBackend->secure = secure;
+	transport->testBackend->listenPort = port;
 	transport->secure = secure;
 	transport->process (client, input.toLatin1 ());
 	

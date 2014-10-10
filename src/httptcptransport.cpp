@@ -37,8 +37,8 @@ public:
 };
 }
 
-Nuria::HttpTcpTransport::HttpTcpTransport (QTcpSocket *socket, HttpServer *server)
-	: HttpTransport (server), d_ptr (new HttpTcpTransportPrivate)
+Nuria::HttpTcpTransport::HttpTcpTransport (QTcpSocket *socket, HttpBackend *backend, HttpServer *server)
+	: HttpTransport (backend, server), d_ptr (new HttpTcpTransportPrivate)
 {
 	socket->setParent (this);
 	this->d_ptr->server = server;

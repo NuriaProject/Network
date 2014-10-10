@@ -25,7 +25,9 @@
 namespace Nuria {
 
 class HttpTransportPrivate;
+class HttpBackend;
 class HttpClient;
+class HttpServer;
 
 /**
  * \brief Abstract data transport for HttpClient
@@ -43,6 +45,7 @@ class HttpClient;
  * response has been sent.
  * 
  * The transport is responsible for keeping track of its HttpClient instances.
+ * 
  */
 class NURIA_NETWORK_EXPORT HttpTransport : public QObject {
 	Q_OBJECT
@@ -109,9 +112,9 @@ public:
 	};
 	
 	/**
-	 * Constructor. \a parent is expected to be the HTTP server instance.
+	 * Constructor. \a server will be automatically the owner.
 	 */
-	explicit HttpTransport (QObject *parent = 0);
+	explicit HttpTransport (HttpBackend *backend, HttpServer *server);
 	
 	/** Destructor. */
 	~HttpTransport ();
@@ -176,6 +179,9 @@ public:
 	
 	/** Sets the timeout \a which to \a msec. */
 	void setTimeout (Timeout which, int msec);
+	
+	/** Returns the HttpBackend associated with this transport. */
+	HttpBackend *backend ();
 	
 public slots:
 	

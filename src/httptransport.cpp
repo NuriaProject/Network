@@ -17,6 +17,7 @@
 
 #include "nuria/httptransport.hpp"
 #include "nuria/httpclient.hpp"
+#include "nuria/httpserver.hpp"
 
 namespace Nuria {
 class HttpTransportPrivate {
@@ -29,12 +30,17 @@ public:
 	int timeoutData = HttpTransport::DefaultDataTimeout;
 	int timeoutKeepAlive = HttpTransport::DefaultKeepAliveTimeout;
 	
+	HttpBackend *backend;
+	
 };
 }
 
-Nuria::HttpTransport::HttpTransport (QObject *parent)
-	: QObject (parent), d_ptr (new HttpTransportPrivate)
+Nuria::HttpTransport::HttpTransport (HttpBackend *backend, HttpServer *server)
+	: QObject (server), d_ptr (new HttpTransportPrivate)
 {
+	
+	this->d_ptr->backend = backend;
+	server->addTransport (this);
 	
 }
 
@@ -102,6 +108,10 @@ void Nuria::HttpTransport::setTimeout (HttpTransport::Timeout which, int msec) {
 	}
 	
 	emit timeoutChanged (which, msec);
+}
+
+Nuria::HttpBackend *Nuria::HttpTransport::backend () {
+	return this->d_ptr->backend;
 }
 
 bool Nuria::HttpTransport::flush (HttpClient *client) {

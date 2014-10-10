@@ -32,6 +32,7 @@
 #include "nuria/httpurlencodedreader.hpp"
 #include "nuria/httpmultipartreader.hpp"
 #include "nuria/httptransport.hpp"
+#include "nuria/httpbackend.hpp"
 #include "nuria/httpparser.hpp"
 #include "nuria/httpserver.hpp"
 #include "nuria/httpwriter.hpp"
@@ -153,7 +154,7 @@ void Nuria::HttpClient::updateRequestedUrl () {
 		// Set hostname and port by server configuration
 		this->d_ptr->path.setHost (this->d_ptr->server->fqdn ());
 		bool secure = this->d_ptr->transport->isSecure ();
-		int usedPort = (!secure) ? this->d_ptr->server->port () : this->d_ptr->server->securePort ();
+		int usedPort = this->d_ptr->transport->backend ()->port ();
 		
 		// Set non-standard port
 		if ((secure && usedPort != 443) || (!secure && usedPort != 80)) {
@@ -455,23 +456,46 @@ static QByteArray relativePathToAbsolute (const QString &localPath) {
 	return path;
 }
 
+static int findPort (Nuria::HttpServer *server, bool isSecure) {
+	QVector< Nuria::HttpBackend * > backends = server->backends ();
+	for (int i = 0; i < backends.length (); i++) {
+		Nuria::HttpBackend *cur = backends.at (i);
+		if (cur->isSecure () == isSecure) {
+			return cur->port ();
+		}
+		
+	}
+	
+	// 
+	nWarn() << "Server" << server << "does not have a back-end with isSecure =" << isSecure;
+	return -1;
+}
+
 static QUrl redirectionSchemeUrl (const QString &localPath, bool toSecure, Nuria::HttpClientPrivate *d_ptr) {
 	static const QString http = QStringLiteral("http");
 	static const QString https = QStringLiteral("https");
 	
 	bool isSecure = d_ptr->transport->isSecure ();
-	int port = (toSecure) ? d_ptr->server->securePort () : d_ptr->server->port ();
+	int port = d_ptr->transport->backend ()->port ();
 	QUrl url = d_ptr->path;
 	
-	// Set non-standard port
-	if ((toSecure && !isSecure && port != 443) ||
-	    (!toSecure && isSecure && port != 80)) {
-		url.setPort (port);
-		url.setScheme (toSecure ? https : http);
+	
+	// Find port if switching security level
+	if (isSecure != toSecure) {
+		port = findPort (d_ptr->server, toSecure);
+	} else if (d_ptr->path.port () != -1) {
+		port = d_ptr->path.port ();
+	}
+	
+	// Standard port?
+	if ((toSecure && port == 443) || (!toSecure && port == 80)) {
+		port = -1;
 	}
 	
 	// Set scheme and path
+	url.setScheme (toSecure ? https : http);
 	url.setPath (localPath);
+	url.setPort (port);
 	return url;
 }
 

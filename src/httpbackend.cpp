@@ -15,33 +15,24 @@
  *       distribution.
  */
 
-#include "httpmemorytransport.hpp"
+#include "nuria/httpbackend.hpp"
 
-Nuria::HttpMemoryTransport::HttpMemoryTransport (HttpServer *server)
-	: HttpTransport (new TestBackend (server), server)
+#include "nuria/httpserver.hpp"
+
+Nuria::HttpBackend::HttpBackend (HttpServer *server)
+	: QObject (server)
 {
-	this->testBackend = static_cast< TestBackend * > (backend ());
 	
-	setCurrentRequestCount (1);
-	setMaxRequests (1);
 }
 
-bool Nuria::HttpMemoryTransport::isOpen () const {
-	return true;
+Nuria::HttpBackend::~HttpBackend () {
+	
 }
 
-void Nuria::HttpMemoryTransport::forceClose () {
-	qDebug("forceClose()");
+bool Nuria::HttpBackend::isSecure () const {
+	return false;
 }
 
-void Nuria::HttpMemoryTransport::close (HttpClient *client) {
-	Q_UNUSED(client)
-	qDebug("close()");
-}
-
-bool Nuria::HttpMemoryTransport::sendToRemote (HttpClient *client, const QByteArray &data) {
-	Q_UNUSED(client)
-	this->outData.append (data);
-	bytesSent (client, data.length ());
-	return true;
+Nuria::HttpServer *Nuria::HttpBackend::httpServer () const {
+	return qobject_cast< HttpServer * > (parent ());
 }

@@ -19,9 +19,29 @@
 #define NURIA_HTTPMEMORYTRANSPORT_HPP
 
 #include <nuria/httptransport.hpp>
+#include <nuria/httpbackend.hpp>
 #include <QBuffer>
 
 namespace Nuria {
+
+class TestBackend : public HttpBackend {
+public:
+	int listenPort;
+	bool secure;
+	
+	TestBackend (HttpServer *server, int port = 80, bool isSecure = false)
+	        : HttpBackend (server), listenPort (port), secure (isSecure)
+	{ }
+	
+	bool isListening () const override
+	{ return true; }
+	
+	int port () const override
+	{ return listenPort; }
+	
+	bool isSecure () const
+	{ return secure; }
+};
 
 /**
  * \brief HttpTransport which uses a in-memory buffer for testing purposes.
@@ -31,9 +51,10 @@ class HttpMemoryTransport : public HttpTransport {
 public:
 	QByteArray outData;
 	bool secure = false;
+	TestBackend *testBackend;
 	
 	/** Constructor. */
-	explicit HttpMemoryTransport (QObject *parent = 0);
+	explicit HttpMemoryTransport (HttpServer *server);
 	
 	QByteArray process (HttpClient *client, QByteArray data) {
 		readFromRemote (client, data);

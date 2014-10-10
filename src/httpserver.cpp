@@ -23,55 +23,37 @@
 #include <QDir>
 
 #include "nuria/httptcptransport.hpp"
+#include "nuria/httpbackend.hpp"
 #include "nuria/httpclient.hpp"
 #include "nuria/sslserver.hpp"
 #include "nuria/httpnode.hpp"
 #include <nuria/debug.hpp>
 
+#include "private/httptcpbackend.hpp"
 #include "private/httpprivate.hpp"
 
 namespace Nuria {
 class HttpServerPrivate {
 public:
 	
-	QTcpServer *server;
-	SslServer *sslServer;
 	HttpNode *root;
-	int port;
-	int securePort;
 	QString fqdn;
+	
+	QVector< HttpBackend * > backends;
 	
 };
 }
 
-Nuria::HttpServer::HttpServer (bool supportSsl, QObject *parent)
+Nuria::HttpServer::HttpServer (QObject *parent)
 	: QObject (parent), d_ptr (new HttpServerPrivate)
 {
 	
 	// Register meta types
 	qRegisterMetaType< HttpClient * > ();
 	
-	// 
-	this->d_ptr->sslServer = 0;
-	this->d_ptr->port = -1;
-	this->d_ptr->securePort = -1;
-	
-	// Create TCP server and node
-	this->d_ptr->server = new QTcpServer (this);
-	
+	// Create root node
 	this->d_ptr->root = new HttpNode (this);
 	this->d_ptr->root->setResourceName (QStringLiteral("ROOT"));
-	
-	// Connect to m_server's newConnection() signal
-	connect (this->d_ptr->server, SIGNAL(newConnection()), SLOT(newClient()));
-	
-	// Setup SSL server
-	if (supportSsl) {
-		this->d_ptr->sslServer = new SslServer (this);
-		
-		connect (this->d_ptr->sslServer, SIGNAL(newConnection()), SLOT(newClient()));
-		
-	}
 	
 }
 
@@ -89,97 +71,51 @@ void Nuria::HttpServer::setRoot (HttpNode *node) {
 	if (this->d_ptr->root == node)
 		return;
 	
-	// Delete m_root and take ownership of node
+	// Delete current root and take ownership of node
 	delete this->d_ptr->root;
 	this->d_ptr->root = node;
 	
 	node->setParent (this);
-	node->d_ptr->parent = 0;
+	node->d_ptr->parent = nullptr;
 	
 }
 
 bool Nuria::HttpServer::listen (const QHostAddress &interface, quint16 port) {
-	if (this->d_ptr->server->listen (interface, port)) {
-		this->d_ptr->port = port;
-		return true;
-	}
-	
-	this->d_ptr->port = -1;
-	return false;
-	
+	return addQTcpServerBackend (new QTcpServer, interface, port);
 }
 
-bool Nuria::HttpServer::listenSecure (const QHostAddress &interface, quint16 port) {
+bool Nuria::HttpServer::listenSecure (const QSslCertificate &certificate, const QSslKey &privateKey,
+                                      const QHostAddress &interface, quint16 port) {
+	SslServer *server = new SslServer;
+	server->setLocalCertificate (certificate);
+	server->setPrivateKey (privateKey);
 	
-	this->d_ptr->securePort = -1;
-	if (this->d_ptr->sslServer) {
-		if (this->d_ptr->sslServer->listen (interface, port)) {
-			this->d_ptr->securePort = port;
-			return true;
-		}
-		
-	}
-	
-	return false;
+	return addQTcpServerBackend (server, interface, port);
 }
 
-QSslCertificate Nuria::HttpServer::localCertificate () const {
-	if (this->d_ptr->sslServer) {
-		return this->d_ptr->sslServer->localCertificate ();
-	}
-	
-	return QSslCertificate ();
-}
-
-QSslKey Nuria::HttpServer::privateKey () const {
-	if (this->d_ptr->sslServer) {
-		return this->d_ptr->sslServer->privateKey ();
-	}
-	
-	return QSslKey ();
-}
-
-const QString &Nuria::HttpServer::fqdn () const {
+QString Nuria::HttpServer::fqdn () const {
 	return this->d_ptr->fqdn;
-}
-
-void Nuria::HttpServer::setLocalCertificate (const QSslCertificate &cert) {
-	if (this->d_ptr->sslServer) {
-		this->d_ptr->sslServer->setLocalCertificate (cert);
-	}
-	
-}
-
-void Nuria::HttpServer::setPrivateKey (const QSslKey &key) {
-	if (this->d_ptr->sslServer) {
-		this->d_ptr->sslServer->setPrivateKey (key);
-	}
-	
-}
-
-int Nuria::HttpServer::port () const {
-	return this->d_ptr->port;
-}
-
-int Nuria::HttpServer::securePort () const {
-	return this->d_ptr->securePort;
 }
 
 void Nuria::HttpServer::setFqdn (const QString &fqdn) {
 	this->d_ptr->fqdn = fqdn;
 }
 
-void Nuria::HttpServer::newClient () {
-	QTcpServer *server = qobject_cast< QTcpServer * > (sender ());
-	
-	if (!server)
-		return;
-	
-	while (server->hasPendingConnections ()) {
-		
-		QTcpSocket *socket = server->nextPendingConnection ();
-		HttpTcpTransport *transport = new HttpTcpTransport (socket, this);
-		Q_UNUSED(transport)
+void Nuria::HttpServer::addBackend (HttpBackend *backend) {
+	backend->setParent (this);
+	this->d_ptr->backends.append (backend);
+}
+
+QVector< Nuria::HttpBackend * > Nuria::HttpServer::backends () const {
+	return this->d_ptr->backends;
+}
+
+void Nuria::HttpServer::stopListening (int port) {
+	for (int i = 0; i < this->d_ptr->backends.length (); i++) {
+		if (this->d_ptr->backends.at (i)->port () == port) {
+			delete this->d_ptr->backends.takeAt (i);
+			return;
+		}
 		
 	}
 	
@@ -203,4 +139,21 @@ bool Nuria::HttpServer::invokeByPath (HttpClient *client, const QString &path) {
 	
 	return false;
 	
+}
+
+bool Nuria::HttpServer::addQTcpServerBackend (QTcpServer *server, const QHostAddress &interface, quint16 port) {
+	Internal::HttpTcpBackend *backend = new Internal::HttpTcpBackend (server, this);
+	
+	if (!backend->listen (interface, port)) {
+		delete backend;
+		return false;
+	}
+	
+	// 
+	this->d_ptr->backends.append (backend);
+	return true;
+}
+
+void Nuria::HttpServer::addTransport (HttpTransport *transport) {
+	Q_UNUSED(transport);
 }

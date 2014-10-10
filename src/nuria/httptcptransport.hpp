@@ -35,7 +35,7 @@ class NURIA_NETWORK_EXPORT HttpTcpTransport : public HttpTransport {
 public:
 	
 	/** Constructor. */
-	explicit HttpTcpTransport (QTcpSocket *socket, HttpServer *server);
+	explicit HttpTcpTransport (QTcpSocket *socket, HttpBackend *backend, HttpServer *server);
 	
 	/** Destructor. */
 	~HttpTcpTransport () override;

@@ -42,7 +42,7 @@ private slots:
 	
 private:
 	HttpClient *createClient (const QByteArray &method, bool withBody = false) {
-		HttpMemoryTransport *transport = new HttpMemoryTransport;
+		HttpMemoryTransport *transport = new HttpMemoryTransport (this->server);
 		HttpClient *client = new HttpClient (transport, this->server);
 		
 		if (!withBody) {
@@ -64,8 +64,8 @@ private:
 		client->open (QIODevice::ReadWrite);
 	}
 	
-	HttpMemoryTransport *transport = new HttpMemoryTransport;
 	HttpServer *server = new HttpServer (this);
+	HttpMemoryTransport *transport = new HttpMemoryTransport (server);
 	HttpClient *client = new HttpClient (transport, server);
 	TestNode *node = new TestNode;
 	
@@ -157,7 +157,7 @@ void RestfulHttpNodeTest::invokeNonStreamingPostHandlerLater () {
 	node->setRestfulHandler ("nostream/{one}-{two}/{three}", { "one", "two", "three" }, cb, true);
 	
 	// Create client
-	HttpMemoryTransport *transport = new HttpMemoryTransport;
+	HttpMemoryTransport *transport = new HttpMemoryTransport (server);
 	HttpClient *postClient = new HttpClient (transport, server);
 	
 	// Invoke
