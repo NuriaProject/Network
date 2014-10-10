@@ -42,11 +42,14 @@ SET(NuriaNetwork_SRC
     src/nuria/network_global.hpp
     src/restfulhttpnode.cpp
     src/nuria/restfulhttpnode.hpp
+    src/httpbackend.cpp
+    src/nuria/httpbackend.hpp
     src/sslserver.cpp
     src/nuria/sslserver.hpp
     src/private/httpprivate.hpp
     src/private/standardfilters.cpp
     src/private/standardfilters.hpp
+    src/private/httptcpbackend.hpp
     src/private/crc32.h
     src/private/adler32.h
 )

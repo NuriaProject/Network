@@ -87,7 +87,7 @@ public:
 	
 	/**
 	 * Adds a SSL server, listening on \a interface and \a port.
-	 * Returns \c on success.
+	 * Returns \c true on success.
 	 */
 	bool listenSecure (const QSslCertificate &certificate, const QSslKey &privateKey,
 	                   const QHostAddress &interface = QHostAddress::Any, quint16 port = 443);
