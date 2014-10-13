@@ -15,27 +15,26 @@
  *       distribution.
  */
 
-#ifndef NURIA_HTTPTCPTRANSPORT_HPP
-#define NURIA_HTTPTCPTRANSPORT_HPP
+#ifndef NURIA_INTERNAL_HTTPTCPTRANSPORT_HPP
+#define NURIA_INTERNAL_HTTPTCPTRANSPORT_HPP
 
 #include "httptransport.hpp"
 
 class QTcpSocket;
 
 namespace Nuria {
-
-class HttpTcpTransportPrivate;
 class HttpServer;
 
-/**
- * \brief HttpClient transport for TCP with or without SSL connections.
- */
-class NURIA_NETWORK_EXPORT HttpTcpTransport : public HttpTransport {
+namespace Internal {
+class HttpTcpTransportPrivate;
+class HttpTcpBackend;
+
+class HttpTcpTransport : public HttpTransport {
 	Q_OBJECT
 public:
 	
 	/** Constructor. */
-	explicit HttpTcpTransport (QTcpSocket *socket, HttpBackend *backend, HttpServer *server);
+	explicit HttpTcpTransport (qintptr handle, Internal::HttpTcpBackend *backend, HttpServer *server);
 	
 	/** Destructor. */
 	~HttpTcpTransport () override;
@@ -50,8 +49,9 @@ public:
 	bool isOpen () const override;
 	
 public slots:
-	bool flush (HttpClient *client) override;
+	bool flush (HttpClient *) override;
 	void forceClose () override;
+	void init () override;
 	
 private slots:
 	bool closeSocketWhenBytesWereWritten ();
@@ -71,11 +71,13 @@ private:
 	bool wasLastRequest ();
 	void startTimeout (Timeout mode);
 	void killTimeout ();
+	void connectionReady ();
 	
 	HttpTcpTransportPrivate *d_ptr;
 	
 };
 
 }
+}
 
-#endif // NURIA_HTTPTCPTRANSPORT_HPP
+#endif // NURIA_INTERNAL_HTTPTCPTRANSPORT_HPP

@@ -15,38 +15,40 @@
  *       distribution.
  */
 
-#ifndef NURIA_INTERNAL_HTTPTCPBACKEND_HPP
-#define NURIA_INTERNAL_HTTPTCPBACKEND_HPP
+#ifndef NURIA_INTERNAL_HTTPTHREAD_HPP
+#define NURIA_INTERNAL_HTTPTHREAD_HPP
 
-#include "../nuria/httptcptransport.hpp"
-#include "../nuria/httpbackend.hpp"
-#include "../nuria/httpserver.hpp"
+#include <QThread>
 
 namespace Nuria {
+class HttpServer;
+
 namespace Internal {
 
-class TcpServer;
-
-class HttpTcpBackend : public HttpBackend {
+class HttpThread : public QThread {
 	Q_OBJECT
 public:
 	
-	HttpTcpBackend (TcpServer *server, HttpServer *parent);
+	explicit HttpThread (HttpServer *server = 0);
+	~HttpThread () override;
 	
-	bool listen (const QHostAddress &interface, quint16 port);
-
-	bool isListening () const override;
-	int port () const override;
+	void incrementRunning ();
+	void transportDestroyed ();
 	
-	void newClient (qintptr handle);
+public slots:
 	
-	TcpServer *tcpServer () const;
+	// Waits for the currently processed request to be completed and
+	// deletes the thread itself afterwards.
+	void stopGraceful ();
 	
 private:
-	TcpServer *m_server;
+	QAtomicInt m_running;
+	QAtomicInt m_stop;
+	HttpServer *m_server;
+	
 };
 
 }
 }
 
-#endif // NURIA_INTERNAL_HTTPTCPBACKEND_HPP
+#endif // NURIA_INTERNAL_HTTPTHREAD_HPP

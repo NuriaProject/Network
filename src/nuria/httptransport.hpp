@@ -46,6 +46,10 @@ class HttpServer;
  * 
  * The transport is responsible for keeping track of its HttpClient instances.
  * 
+ * \note The HttpServer may choose to move a HttpTransport to another thread
+ * for parallel execution. This means that the HttpTransport must be able to
+ * be run in another thread than its HttpBackend.
+ * 
  */
 class NURIA_NETWORK_EXPORT HttpTransport : public QObject {
 	Q_OBJECT
@@ -199,6 +203,14 @@ public slots:
 	 */
 	virtual void forceClose () = 0;
 	
+	/**
+	 * Called by the HttpServer when the HttpTransport was moved by
+	 * addToServer(). If the server didn't move the transport,
+	 * addToServer() will call this function.
+	 * The default implementation does nothing.
+	 */
+	virtual void init ();
+	
 signals:
 	
 	/** Emitted when the connection to the client has been lost. */
@@ -237,6 +249,15 @@ protected:
 	 * call to sendToRemote() has been sent to the client.
 	 */
 	void bytesSent (HttpClient *client, qint64 bytes);
+	
+	/**
+	 * Called by \b implementations after their initialization routine to
+	 * tell the HttpServer that the transport can now be moved to a
+	 * processing thread. Returns \c true if the instance has been moved.
+	 * 
+	 * \sa init
+	 */
+	bool addToServer ();
 	
 private:
 	HttpTransportPrivate *d_ptr;

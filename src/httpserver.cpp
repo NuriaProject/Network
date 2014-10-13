@@ -17,10 +17,9 @@
 
 #include "nuria/httpserver.hpp"
 
-#include <QMetaMethod>
 #include <QStringList>
 #include <QTcpServer>
-#include <QDir>
+#include <QMutex>
 
 #include "nuria/httptcptransport.hpp"
 #include "nuria/httpbackend.hpp"
@@ -31,6 +30,8 @@
 
 #include "private/httptcpbackend.hpp"
 #include "private/httpprivate.hpp"
+#include "private/httpthread.hpp"
+#include "private/tcpserver.hpp"
 
 namespace Nuria {
 class HttpServerPrivate {
@@ -40,6 +41,9 @@ public:
 	QString fqdn;
 	
 	QVector< HttpBackend * > backends;
+	QVector< Internal::HttpThread * > threads;
+	int threadIndex = 0;
+	int activeThreads = 0;
 	
 };
 }
@@ -81,16 +85,16 @@ void Nuria::HttpServer::setRoot (HttpNode *node) {
 }
 
 bool Nuria::HttpServer::listen (const QHostAddress &interface, quint16 port) {
-	return addQTcpServerBackend (new QTcpServer, interface, port);
+	return addTcpServerBackend (new Internal::TcpServer (false), interface, port);
 }
 
 bool Nuria::HttpServer::listenSecure (const QSslCertificate &certificate, const QSslKey &privateKey,
                                       const QHostAddress &interface, quint16 port) {
-	SslServer *server = new SslServer;
+	Internal::TcpServer *server = new Internal::TcpServer (true);
 	server->setLocalCertificate (certificate);
 	server->setPrivateKey (privateKey);
 	
-	return addQTcpServerBackend (server, interface, port);
+	return addTcpServerBackend (server, interface, port);
 }
 
 QString Nuria::HttpServer::fqdn () const {
@@ -121,6 +125,26 @@ void Nuria::HttpServer::stopListening (int port) {
 	
 }
 
+int Nuria::HttpServer::maxThreads () const {
+	return this->d_ptr->activeThreads;
+}
+
+void Nuria::HttpServer::setMaxThreads (int amount) {
+	if (amount == OneThreadPerCore) {
+		amount = chooseThreadCount ();
+	}
+	
+	// Start/stop threads
+	if (amount < this->d_ptr->activeThreads) {
+		stopProcessingThreads (this->d_ptr->activeThreads - amount);
+	} else if (amount > this->d_ptr->activeThreads) {
+		startProcessingThreads (amount - this->d_ptr->activeThreads);
+	}
+	
+	// 
+	this->d_ptr->activeThreads = amount;
+}
+
 bool Nuria::HttpServer::invokeByPath (HttpClient *client, const QString &path) {
 	
 	// Split the path.
@@ -138,10 +162,9 @@ bool Nuria::HttpServer::invokeByPath (HttpClient *client, const QString &path) {
 	}
 	
 	return false;
-	
 }
 
-bool Nuria::HttpServer::addQTcpServerBackend (QTcpServer *server, const QHostAddress &interface, quint16 port) {
+bool Nuria::HttpServer::addTcpServerBackend (Internal::TcpServer *server, const QHostAddress &interface, quint16 port) {
 	Internal::HttpTcpBackend *backend = new Internal::HttpTcpBackend (server, this);
 	
 	if (!backend->listen (interface, port)) {
@@ -154,6 +177,58 @@ bool Nuria::HttpServer::addQTcpServerBackend (QTcpServer *server, const QHostAdd
 	return true;
 }
 
-void Nuria::HttpServer::addTransport (HttpTransport *transport) {
-	Q_UNUSED(transport);
+bool Nuria::HttpServer::addTransport (HttpTransport *transport) {
+	if (this->d_ptr->threads.isEmpty ()) {
+		return false;
+	}
+	
+	// Move to the next thread.
+	// TODO: This is a naive approach which is bad for servers that have lots of long-running requests.
+	int index = this->d_ptr->threadIndex % this->d_ptr->activeThreads;
+	this->d_ptr->threadIndex++;
+	
+	// 
+	Internal::HttpThread *thread = this->d_ptr->threads.at (index);
+	transport->setParent (nullptr);
+	transport->moveToThread (thread);
+	thread->incrementRunning ();
+	connect (transport, &QObject::destroyed,
+	         thread, &Internal::HttpThread::transportDestroyed);
+	
+	// Transport has been moved to another thread.
+	return true;
+}
+
+void Nuria::HttpServer::startProcessingThreads (int amount) {
+	for (int i = 0; i < amount; i++) {
+		Internal::HttpThread *thread = new Internal::HttpThread (this);
+		connect (thread, &QObject::destroyed, this, &HttpServer::threadStopped);
+		this->d_ptr->threads.append (thread);
+		
+		thread->start ();
+	}
+	
+}
+
+void Nuria::HttpServer::stopProcessingThreads (int lastN) {
+	int count = this->d_ptr->threads.length ();
+	int i = count - lastN;
+	
+	for (; i < count; i++) {
+		Internal::HttpThread *thread = this->d_ptr->threads.at (i);
+		Internal::HttpThread::staticMetaObject.invokeMethod (thread, "stopGraceful");
+	}
+	
+}
+
+int Nuria::HttpServer::chooseThreadCount () {
+	return std::max (0, QThread::idealThreadCount ());
+}
+
+void Nuria::HttpServer::threadStopped (QObject *obj) {
+	int idx = this->d_ptr->threads.indexOf (static_cast< Internal::HttpThread * > (obj));
+	if (idx != -1) {
+		this->d_ptr->threads.removeAt (idx);
+	}
+	
 }

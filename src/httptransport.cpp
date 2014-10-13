@@ -16,8 +16,10 @@
  */
 
 #include "nuria/httptransport.hpp"
+#include "nuria/httpbackend.hpp"
 #include "nuria/httpclient.hpp"
 #include "nuria/httpserver.hpp"
+#include <nuria/callback.hpp>
 
 namespace Nuria {
 class HttpTransportPrivate {
@@ -40,7 +42,6 @@ Nuria::HttpTransport::HttpTransport (HttpBackend *backend, HttpServer *server)
 {
 	
 	this->d_ptr->backend = backend;
-	server->addTransport (this);
 	
 }
 
@@ -119,6 +120,10 @@ bool Nuria::HttpTransport::flush (HttpClient *client) {
 	return true;
 }
 
+void Nuria::HttpTransport::init () {
+	// 
+}
+
 void Nuria::HttpTransport::setCurrentRequestCount (int count) {
 	this->d_ptr->requestCount = count;
 }
@@ -129,4 +134,16 @@ void Nuria::HttpTransport::readFromRemote (HttpClient *client, QByteArray &data)
 
 void Nuria::HttpTransport::bytesSent (HttpClient *client, qint64 bytes) {
 	client->bytesSent (bytes);
+}
+
+bool Nuria::HttpTransport::addToServer () {
+	bool wasMoved = this->d_ptr->backend->httpServer ()->addTransport (this);
+	if (wasMoved) {
+		Callback cb (this, SLOT(init()));
+		cb (); // inter-thread invocation.
+	} else {
+		init ();
+	}
+	
+	return wasMoved;
 }

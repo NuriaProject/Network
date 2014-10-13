@@ -15,38 +15,36 @@
  *       distribution.
  */
 
-#ifndef NURIA_INTERNAL_HTTPTCPBACKEND_HPP
-#define NURIA_INTERNAL_HTTPTCPBACKEND_HPP
+#include "httptcpbackend.hpp"
+#include "tcpserver.hpp"
 
-#include "../nuria/httptcptransport.hpp"
-#include "../nuria/httpbackend.hpp"
-#include "../nuria/httpserver.hpp"
 
-namespace Nuria {
-namespace Internal {
-
-class TcpServer;
-
-class HttpTcpBackend : public HttpBackend {
-	Q_OBJECT
-public:
+Nuria::Internal::HttpTcpBackend::HttpTcpBackend (TcpServer *server, HttpServer *parent)
+        : HttpBackend (parent), m_server (server)
+{
+	server->setParent (this);
 	
-	HttpTcpBackend (TcpServer *server, HttpServer *parent);
+	connect (server, &TcpServer::connectionRequested, this, &HttpTcpBackend::newClient);
 	
-	bool listen (const QHostAddress &interface, quint16 port);
-
-	bool isListening () const override;
-	int port () const override;
-	
-	void newClient (qintptr handle);
-	
-	TcpServer *tcpServer () const;
-	
-private:
-	TcpServer *m_server;
-};
-
-}
 }
 
-#endif // NURIA_INTERNAL_HTTPTCPBACKEND_HPP
+bool Nuria::Internal::HttpTcpBackend::listen (const QHostAddress &interface, quint16 port) {
+	return this->m_server->listen (interface, port);
+}
+
+bool Nuria::Internal::HttpTcpBackend::isListening () const {
+	return this->m_server->isListening ();
+}
+
+int Nuria::Internal::HttpTcpBackend::port () const {
+	return this->m_server->serverPort ();
+}
+
+void Nuria::Internal::HttpTcpBackend::newClient (qintptr handle) {
+	HttpTcpTransport *transport = new HttpTcpTransport (handle, this, httpServer ());
+	Q_UNUSED(transport)
+}
+
+Nuria::Internal::TcpServer *Nuria::Internal::HttpTcpBackend::tcpServer () const {
+	return this->m_server;
+}

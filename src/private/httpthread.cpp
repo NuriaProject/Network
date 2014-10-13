@@ -15,38 +15,40 @@
  *       distribution.
  */
 
-#ifndef NURIA_INTERNAL_HTTPTCPBACKEND_HPP
-#define NURIA_INTERNAL_HTTPTCPBACKEND_HPP
+#include "httpthread.hpp"
 
-#include "../nuria/httptcptransport.hpp"
-#include "../nuria/httpbackend.hpp"
 #include "../nuria/httpserver.hpp"
+#include <nuria/debug.hpp>
 
-namespace Nuria {
-namespace Internal {
-
-class TcpServer;
-
-class HttpTcpBackend : public HttpBackend {
-	Q_OBJECT
-public:
+Nuria::Internal::HttpThread::HttpThread (HttpServer *server)
+        : QThread (server), m_server (server)
+{
 	
-	HttpTcpBackend (TcpServer *server, HttpServer *parent);
-	
-	bool listen (const QHostAddress &interface, quint16 port);
-
-	bool isListening () const override;
-	int port () const override;
-	
-	void newClient (qintptr handle);
-	
-	TcpServer *tcpServer () const;
-	
-private:
-	TcpServer *m_server;
-};
-
-}
 }
 
-#endif // NURIA_INTERNAL_HTTPTCPBACKEND_HPP
+Nuria::Internal::HttpThread::~HttpThread () {
+	if (this->m_running.load () != 0) {
+		nError() << "Destroying thread with running HttpTransports!";
+	}
+	
+}
+
+void Nuria::Internal::HttpThread::incrementRunning () {
+	this->m_running.fetchAndAddRelaxed (1);
+}
+
+void Nuria::Internal::HttpThread::transportDestroyed () {
+	this->m_running.fetchAndSubRelaxed (1);
+	
+	if (this->m_stop.load () == 1) {
+		deleteLater ();
+	}
+}
+
+void Nuria::Internal::HttpThread::stopGraceful () {
+	this->m_stop.store (1);
+	if (this->m_running.load () == 0) {
+		deleteLater ();
+	}
+	
+}

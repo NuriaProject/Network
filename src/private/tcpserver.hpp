@@ -15,38 +15,52 @@
  *       distribution.
  */
 
-#ifndef NURIA_INTERNAL_HTTPTCPBACKEND_HPP
-#define NURIA_INTERNAL_HTTPTCPBACKEND_HPP
+#ifndef NURIA_INTERNAL_TCPSERVER_HPP
+#define NURIA_INTERNAL_TCPSERVER_HPP
 
-#include "../nuria/httptcptransport.hpp"
-#include "../nuria/httpbackend.hpp"
-#include "../nuria/httpserver.hpp"
+#include <QSslCertificate>
+#include <QTcpServer>
+#include <QSslError>
+#include <QSslKey>
 
 namespace Nuria {
+
 namespace Internal {
 
-class TcpServer;
+class HttpTcpBackend;
 
-class HttpTcpBackend : public HttpBackend {
+class TcpServer : public QTcpServer {
 	Q_OBJECT
 public:
+	explicit TcpServer (bool useSsl, QObject *parent = 0);
 	
-	HttpTcpBackend (TcpServer *server, HttpServer *parent);
+	const QSslKey &privateKey () const;
+	const QSslCertificate &localCertificate () const;
 	
-	bool listen (const QHostAddress &interface, quint16 port);
-
-	bool isListening () const override;
-	int port () const override;
+	bool useEncryption () const;
 	
-	void newClient (qintptr handle);
+	void setPrivateKey (const QSslKey &key);
+	void setLocalCertificate (const QSslCertificate &cert);
 	
-	TcpServer *tcpServer () const;
+	QTcpSocket *handleToSocket (qintptr handle);
+	
+protected:
+	
+	void incomingConnection (qintptr handle) override;
+	
+signals:
+	
+	void connectionRequested (qintptr handle);
 	
 private:
-	TcpServer *m_server;
+	
+	bool m_ssl;
+	QSslKey m_key;
+	QSslCertificate m_cert;
+	
 };
-
-}
 }
 
-#endif // NURIA_INTERNAL_HTTPTCPBACKEND_HPP
+}
+
+#endif // NURIA_INTERNAL_TCPSERVER_HPP

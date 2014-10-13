@@ -154,7 +154,7 @@ Nuria::SlotInfo Nuria::HttpNode::connectSlot (const QString &name, QObject *rece
 	}
 	
 	// Create binding
-	SlotInfo info (Callback (receiver, slot));
+	SlotInfo info (Callback (receiver, slot, false, Qt::DirectConnection));
 	this->d_ptr->mySlots.insert (name, info);
 	
 	return info;

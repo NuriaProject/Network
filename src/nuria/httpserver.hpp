@@ -27,6 +27,7 @@
 class QTcpServer;
 
 namespace Nuria {
+namespace Internal { class TcpServer; }
 class HttpServerPrivate;
 class HttpTransport;
 class HttpBackend;
@@ -56,10 +57,38 @@ class HttpNode;
  * 
  * Please see HttpNode for further information.
  * 
+ * \par Multithreading
+ * 
+ * A HttpServer can either do all request execution in the thread it lifes in,
+ * which is the default setting, or use threading to offload requests. If
+ * threading is active (By using setMaxThreads), all request handling will be
+ * done in threads and none will be handled in the HttpServer thread.
+ * 
+ * \warning When using multi-threading, be aware that your code is also
+ * thread-safe.
+ * 
+ * Tip: You can use DependencyManager to manage resources
  */
 class NURIA_NETWORK_EXPORT HttpServer : public QObject {
 	Q_OBJECT
 public:
+	
+	/** Additional threading options for setMaxThreads(). */
+	enum ThreadingMode {
+		
+		/**
+		 * Uses no threads. All processing is done in the thread of the
+		 * HttpServer instance.
+		 */
+		NoThreading = 0,
+		
+		/**
+		 * When passed to setMaxThreads(), one thread per CPU core will
+		 * be created. maxThreads() will return the chosen value instead
+		 * of OneThreadPerCore.
+		 */
+		OneThreadPerCore = -1
+	};
 	
 	/**
 	 * Constructor.
@@ -116,6 +145,20 @@ public:
 	/** Removes the back-end which is listening on \a port. */
 	void stopListening (int port);
 	
+	/**
+	 * Returns the amount of threads used to process requests.
+	 * The default result is \c NoThreading.
+	 */
+	int maxThreads () const;
+	
+	/**
+	 * Sets the \a amount of threads to be used for processing requests.
+	 * See ThreadingMode for other values that can be passed.
+	 * 
+	 * If the new value is less than the current one, requests running in
+	 * the affected will be processed, after which they're destroyed.
+	 */
+	void setMaxThreads (int amount);
 	
 private:
 	friend class HttpTransport;
@@ -127,8 +170,12 @@ private:
 	 * by the \a path. Returns \a true on success.
 	 */
 	bool invokeByPath (HttpClient *client, const QString &path);
-	bool addQTcpServerBackend (QTcpServer *server, const QHostAddress &interface, quint16 port);
-	void addTransport (HttpTransport *transport);
+	bool addTcpServerBackend (Internal::TcpServer *server, const QHostAddress &interface, quint16 port);
+	bool addTransport(HttpTransport *transport);
+	void startProcessingThreads (int amount);
+	void stopProcessingThreads (int lastN);
+	int chooseThreadCount ();
+	void threadStopped (QObject *obj);
 	
 	// 
 	HttpServerPrivate *d_ptr;
