@@ -235,6 +235,14 @@ void Nuria::Internal::HttpTcpTransport::init () {
 	this->d_ptr->socket = tcpBackend->tcpServer ()->handleToSocket (this->d_ptr->socketHandle);
 	this->d_ptr->sslSocket = qobject_cast< QSslSocket * > (this->d_ptr->socket);
 	
+	if (!this->d_ptr->socket) {
+		nError() << "Failed to open TCP socket on handle" << this->d_ptr->socketHandle;
+		return;
+	}
+	
+	// 
+	this->d_ptr->socket->setParent (this);
+	
 	// Connect to signals
 	connect (this->d_ptr->socket, &QTcpSocket::disconnected, this, &HttpTcpTransport::clientDisconnected);
 	connect (this->d_ptr->socket, &QIODevice::readyRead, this, &HttpTcpTransport::dataReceived);
