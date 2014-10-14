@@ -176,7 +176,7 @@ bool Nuria::HttpServer::addTcpServerBackend (Internal::TcpServer *server, const 
 }
 
 bool Nuria::HttpServer::addTransport (HttpTransport *transport) {
-	if (this->d_ptr->threads.isEmpty ()) {
+	if (this->d_ptr->activeThreads < 1) {
 		return false;
 	}
 	
