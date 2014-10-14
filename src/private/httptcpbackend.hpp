@@ -18,7 +18,6 @@
 #ifndef NURIA_INTERNAL_HTTPTCPBACKEND_HPP
 #define NURIA_INTERNAL_HTTPTCPBACKEND_HPP
 
-#include "../nuria/httptcptransport.hpp"
 #include "../nuria/httpbackend.hpp"
 #include "../nuria/httpserver.hpp"
 

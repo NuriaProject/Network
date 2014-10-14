@@ -18,13 +18,11 @@
 #include "nuria/httpserver.hpp"
 
 #include <QStringList>
-#include <QTcpServer>
 #include <QMutex>
 
-#include "nuria/httptcptransport.hpp"
+#include "nuria/httptransport.hpp"
 #include "nuria/httpbackend.hpp"
 #include "nuria/httpclient.hpp"
-#include "nuria/sslserver.hpp"
 #include "nuria/httpnode.hpp"
 #include <nuria/debug.hpp>
 

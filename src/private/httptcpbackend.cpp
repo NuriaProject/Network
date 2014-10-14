@@ -16,8 +16,9 @@
  */
 
 #include "httptcpbackend.hpp"
-#include "tcpserver.hpp"
 
+#include "httptcptransport.hpp"
+#include "tcpserver.hpp"
 
 Nuria::Internal::HttpTcpBackend::HttpTcpBackend (TcpServer *server, HttpServer *parent)
         : HttpBackend (parent), m_server (server)

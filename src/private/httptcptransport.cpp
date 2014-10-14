@@ -15,12 +15,13 @@
  *       distribution.
  */
 
-#include "nuria/httptcptransport.hpp"
-#include "private/httptcpbackend.hpp"
-#include "private/tcpserver.hpp"
-#include "nuria/httpclient.hpp"
-#include "nuria/httpserver.hpp"
+#include "httptcptransport.hpp"
+
+#include "../nuria/httpclient.hpp"
+#include "../nuria/httpserver.hpp"
+#include "httptcpbackend.hpp"
 #include <nuria/debug.hpp>
+#include "tcpserver.hpp"
 
 #include <QSslSocket>
 #include <QTcpSocket>
@@ -55,11 +56,11 @@ Nuria::Internal::HttpTcpTransport::~HttpTcpTransport () {
 	delete this->d_ptr;
 }
 
-Nuria::Internal::HttpTransport::Type Nuria::HttpTcpTransport::type () const {
+Nuria::HttpTransport::Type Nuria::Internal::HttpTcpTransport::type () const {
 	return (this->d_ptr->sslSocket) ? SSL : TCP;
 }
 
-bool Nuria::HttpTcpTransport::isSecure () const {
+bool Nuria::Internal::HttpTcpTransport::isSecure () const {
 	return (this->d_ptr->sslSocket != nullptr);
 }
 

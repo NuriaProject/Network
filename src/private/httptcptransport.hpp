@@ -18,7 +18,7 @@
 #ifndef NURIA_INTERNAL_HTTPTCPTRANSPORT_HPP
 #define NURIA_INTERNAL_HTTPTCPTRANSPORT_HPP
 
-#include "httptransport.hpp"
+#include "../nuria/httptransport.hpp"
 
 class QTcpSocket;
 
@@ -34,7 +34,7 @@ class HttpTcpTransport : public HttpTransport {
 public:
 	
 	/** Constructor. */
-	explicit HttpTcpTransport (qintptr handle, Internal::HttpTcpBackend *backend, HttpServer *server);
+	explicit HttpTcpTransport (qintptr handle, HttpTcpBackend *backend, HttpServer *server);
 	
 	/** Destructor. */
 	~HttpTcpTransport () override;
