@@ -38,6 +38,7 @@ public:
 	HttpServer *server;
 	int timeoutTimer = -1;
 	int bytesReceived = 0;
+	QByteArray buffer;
 	
 };
 }
@@ -188,9 +189,12 @@ void Nuria::Internal::HttpTcpTransport::processData (QByteArray &data) {
 }
 
 void Nuria::Internal::HttpTcpTransport::dataReceived () {
-	QByteArray data = this->d_ptr->socket->readAll ();
+	QByteArray &data = this->d_ptr->buffer;
+	data.append (this->d_ptr->socket->readAll ());
+	int len = 0;
 	
-	while (!data.isEmpty () && this->d_ptr->socket->isOpen ()) {
+	while (data.length () > 0 && data.length () != len &&
+	       this->d_ptr->socket->isOpen ()) {
 		if (this->d_ptr->curClient && !this->d_ptr->curClient->isOpen ()) {
 			close (this->d_ptr->curClient);
 		}
@@ -203,6 +207,7 @@ void Nuria::Internal::HttpTcpTransport::dataReceived () {
 		}
 		
 		// 
+		len = data.length ();
 		processData (data);
 		
 	}
@@ -230,7 +235,7 @@ void Nuria::Internal::HttpTcpTransport::forceClose () {
 }
 
 void Nuria::Internal::HttpTcpTransport::init () {
-	Internal::HttpTcpBackend *tcpBackend = static_cast< Internal::HttpTcpBackend * > (backend ());
+	HttpTcpBackend *tcpBackend = static_cast< HttpTcpBackend * > (backend ());
 	
 	this->d_ptr->socket = tcpBackend->tcpServer ()->handleToSocket (this->d_ptr->socketHandle);
 	this->d_ptr->sslSocket = qobject_cast< QSslSocket * > (this->d_ptr->socket);
