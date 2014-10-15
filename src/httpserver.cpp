@@ -86,6 +86,7 @@ bool Nuria::HttpServer::listen (const QHostAddress &interface, quint16 port) {
 	return addTcpServerBackend (new Internal::TcpServer (false), interface, port);
 }
 
+#ifndef NURIA_NO_SSL_HTTP
 bool Nuria::HttpServer::listenSecure (const QSslCertificate &certificate, const QSslKey &privateKey,
                                       const QHostAddress &interface, quint16 port) {
 	Internal::TcpServer *server = new Internal::TcpServer (true);
@@ -94,6 +95,7 @@ bool Nuria::HttpServer::listenSecure (const QSslCertificate &certificate, const 
 	
 	return addTcpServerBackend (server, interface, port);
 }
+#endif
 
 QString Nuria::HttpServer::fqdn () const {
 	return this->d_ptr->fqdn;

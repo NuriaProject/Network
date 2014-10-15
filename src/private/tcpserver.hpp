@@ -18,10 +18,13 @@
 #ifndef NURIA_INTERNAL_TCPSERVER_HPP
 #define NURIA_INTERNAL_TCPSERVER_HPP
 
-#include <QSslCertificate>
 #include <QTcpServer>
+
+#ifndef NURIA_NO_SSL_HTTP
+#include <QSslCertificate>
 #include <QSslError>
 #include <QSslKey>
+#endif
 
 namespace Nuria {
 
@@ -33,14 +36,17 @@ class TcpServer : public QTcpServer {
 	Q_OBJECT
 public:
 	explicit TcpServer (bool useSsl, QObject *parent = 0);
-	
-	const QSslKey &privateKey () const;
-	const QSslCertificate &localCertificate () const;
+	~TcpServer () override;
 	
 	bool useEncryption () const;
 	
+#ifndef NURIA_NO_SSL_HTTP
+	const QSslKey &privateKey () const;
+	const QSslCertificate &localCertificate () const;
+	
 	void setPrivateKey (const QSslKey &key);
 	void setLocalCertificate (const QSslCertificate &cert);
+#endif
 	
 	QTcpSocket *handleToSocket (qintptr handle);
 	
@@ -55,8 +61,11 @@ signals:
 private:
 	
 	bool m_ssl;
+	
+#ifndef NURIA_NO_SSL_HTTP
 	QSslKey m_key;
 	QSslCertificate m_cert;
+#endif
 	
 };
 }

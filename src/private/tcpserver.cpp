@@ -17,14 +17,31 @@
 
 #include "tcpserver.hpp"
 
-#include <QSslSocket>
+#include <nuria/debug.hpp>
+#include <QTcpSocket>
 
-Nuria::Internal::TcpServer::TcpServer(bool useSsl, QObject *parent)
+#ifndef NURIA_NO_SSL_HTTP
+#include <QSslSocket>
+#endif
+
+Nuria::Internal::TcpServer::TcpServer (bool useSsl, QObject *parent)
 	: QTcpServer (parent), m_ssl (useSsl)
 {
 	
+#ifndef NURIA_NO_SSL_HTTP
+	if (useSsl) {
+		nError() << "Trying to create unsupported SSL server - Was disabled at compile-time.";
+		nError() << "Connections will fail.";
+	}
+#endif
+	
 }
 
+Nuria::Internal::TcpServer::~TcpServer () {
+	// 
+}
+
+#ifndef NURIA_NO_SSL_HTTP
 const QSslKey &Nuria::Internal::TcpServer::privateKey () const {
 	return this->m_key;
 }
@@ -40,6 +57,7 @@ void Nuria::Internal::TcpServer::setPrivateKey (const QSslKey &key) {
 void Nuria::Internal::TcpServer::setLocalCertificate (const QSslCertificate &cert) {
 	this->m_cert = cert;
 }
+#endif
 
 QTcpSocket *Nuria::Internal::TcpServer::handleToSocket (qintptr handle) {
 	if (!this->m_ssl) {
@@ -48,7 +66,8 @@ QTcpSocket *Nuria::Internal::TcpServer::handleToSocket (qintptr handle) {
 		return socket;
 	}
 	
-	// 
+	// SSL
+#ifndef NURIA_NO_SSL_HTTP
 	QSslSocket *socket = new QSslSocket (this);
 	
 	// Certificate and private key
@@ -64,6 +83,10 @@ QTcpSocket *Nuria::Internal::TcpServer::handleToSocket (qintptr handle) {
 	// 
 	socket->startServerEncryption ();
 	return socket;
+#else	
+	return nullptr;
+#endif
+	
 }
 
 bool Nuria::Internal::TcpServer::useEncryption () const {
