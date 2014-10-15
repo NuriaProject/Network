@@ -955,7 +955,8 @@ bool Nuria::HttpClient::pipeToClient (QIODevice *device, qint64 maxlen) {
 	
 	// Decide on Chunked or Streaming mode
 	if (!this->d_ptr->headerSent && !this->d_ptr->outBuffer) {
-		if (this->d_ptr->connectionMode == ConnectionKeepAlive) {
+		if (this->d_ptr->connectionMode == ConnectionKeepAlive &&
+		    (this->d_ptr->transferMode != Buffered || !this->d_ptr->filters.isEmpty ())) {
 			this->d_ptr->transferMode = ChunkedStreaming;
 		} else {
 			this->d_ptr->transferMode = Streaming;
