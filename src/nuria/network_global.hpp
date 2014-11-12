@@ -18,7 +18,7 @@
 #ifndef NURIA_NETWORK_GLOBAL_HPP
 #define NURIA_NETWORK_GLOBAL_HPP
 
-#include <qglobal.h>
+#include <qcompilerdetection.h>
 
 #if defined(NuriaNetwork_EXPORTS)
 #  define NURIA_NETWORK_EXPORT Q_DECL_EXPORT

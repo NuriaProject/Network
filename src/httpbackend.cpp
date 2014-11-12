@@ -33,6 +33,10 @@ bool Nuria::HttpBackend::isSecure () const {
 	return false;
 }
 
+void Nuria::HttpBackend::serverThreadCreated (QThread *thread) {
+	Q_UNUSED(thread)
+}
+
 Nuria::HttpServer *Nuria::HttpBackend::httpServer () const {
 	return qobject_cast< HttpServer * > (parent ());
 }

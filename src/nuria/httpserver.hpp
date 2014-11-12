@@ -173,9 +173,11 @@ private:
 	 */
 	bool invokeByPath (HttpClient *client, const QString &path);
 	bool addTcpServerBackend (Internal::TcpServer *server, const QHostAddress &interface, quint16 port);
-	bool addTransport(HttpTransport *transport);
+	bool addTransport (HttpTransport *transport);
 	void startProcessingThreads (int amount);
 	void stopProcessingThreads (int lastN);
+	void notifyBackendsOfNewThread (QThread *serverThread);
+	void notifyBackendOfThreads (HttpBackend *backend);
 	int chooseThreadCount ();
 	void threadStopped (QObject *obj);
 	

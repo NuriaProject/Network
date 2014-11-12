@@ -29,6 +29,8 @@ class HttpServer;
  * 
  * A HttpBackend is the bridge between a (probably low-level) connection medium, like
  * a TCP listen socket, and the HttpServer this back-end is registered to.
+ * 
+ * For usage see HttpServer::addBackend() and HttpTransport::addToServer().
  */
 class NURIA_NETWORK_EXPORT HttpBackend : public QObject {
 	Q_OBJECT
@@ -59,6 +61,32 @@ public:
 	
 	/** Returns the HTTP server this back-end is connected to. */
 	HttpServer *httpServer() const;
+	
+protected:
+	friend class HttpServer;
+	
+	/**
+	 * Called by the HttpServer when a new server thread has been created.
+	 * This lets back-ends register their own thread-specific bookkeeping
+	 * routines.
+	 * 
+	 * This function will also be called by the HttpServer if no
+	 * multi-threading is used. In this case, the function will be called
+	 * once with \a thread being the one the server is associated with.
+	 * 
+	 * To run some kind of initialization after the \a thread has been
+	 * started, use one of:
+	 * \code
+	 * QTimer::singleShot (0, object, SLOT(...)); // Pre Qt5.4
+	 * QTimer::singleShot (0, object, &Object::...); // Qt5.4 and up
+	 * QTimer::singleShot (0, []() { ... }); // Qt5.4 and up
+	 * \endcode
+	 * 
+	 * \note The function is called in the thread the HttpServer lives in.
+	 * 
+	 * The default implementation does nothing.
+	 */
+	virtual void serverThreadCreated (QThread *thread);
 	
 };
 }

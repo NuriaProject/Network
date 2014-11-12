@@ -108,6 +108,7 @@ void Nuria::HttpServer::setFqdn (const QString &fqdn) {
 void Nuria::HttpServer::addBackend (HttpBackend *backend) {
 	backend->setParent (this);
 	this->d_ptr->backends.append (backend);
+	notifyBackendOfThreads (backend);
 }
 
 QVector< Nuria::HttpBackend * > Nuria::HttpServer::backends () const {
@@ -174,11 +175,12 @@ bool Nuria::HttpServer::addTcpServerBackend (Internal::TcpServer *server, const 
 	
 	// 
 	this->d_ptr->backends.append (backend);
+	notifyBackendOfThreads (backend);
 	return true;
 }
 
 bool Nuria::HttpServer::addTransport (HttpTransport *transport) {
-	if (this->d_ptr->activeThreads < 1) {
+	if (this->d_ptr->activeThreads < 1 || this->thread () != transport->thread ()) {
 		return false;
 	}
 	
@@ -202,8 +204,10 @@ bool Nuria::HttpServer::addTransport (HttpTransport *transport) {
 void Nuria::HttpServer::startProcessingThreads (int amount) {
 	for (int i = 0; i < amount; i++) {
 		Internal::HttpThread *thread = new Internal::HttpThread (this);
+		
 		connect (thread, &QObject::destroyed, this, &HttpServer::threadStopped);
 		this->d_ptr->threads.append (thread);
+		notifyBackendsOfNewThread (thread);
 		
 		thread->start ();
 	}
@@ -217,6 +221,26 @@ void Nuria::HttpServer::stopProcessingThreads (int lastN) {
 	for (; i < count; i++) {
 		Internal::HttpThread *thread = this->d_ptr->threads.at (i);
 		Internal::HttpThread::staticMetaObject.invokeMethod (thread, "stopGraceful");
+	}
+	
+}
+
+void Nuria::HttpServer::notifyBackendsOfNewThread (QThread *serverThread) {
+	for (int i = 0; i < this->d_ptr->backends.length (); i++) {
+		this->d_ptr->backends.at (i)->serverThreadCreated (serverThread);
+	}
+	
+}
+
+void Nuria::HttpServer::notifyBackendOfThreads (HttpBackend *backend) {
+	if (this->d_ptr->activeThreads < 1) {
+		backend->serverThreadCreated (thread ());
+		return;
+	}
+	
+	// 
+	for (int i = 0; i < this->d_ptr->activeThreads; i++) {
+		backend->serverThreadCreated (this->d_ptr->threads.at (i));
 	}
 	
 }
