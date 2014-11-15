@@ -47,6 +47,8 @@ SET(NuriaNetwork_SRC
     src/nuria/httpbackend.hpp
     src/sslserver.cpp
     src/nuria/sslserver.hpp
+    src/fastcgibackend.cpp
+    src/nuria/fastcgibackend.hpp
     src/private/httptcptransport.cpp
     src/private/httptcptransport.hpp
     src/private/httpprivate.hpp
@@ -58,6 +60,17 @@ SET(NuriaNetwork_SRC
     src/private/tcpserver.hpp
     src/private/httptcpbackend.cpp
     src/private/httptcpbackend.hpp
+    src/private/fastcgireader.cpp
+    src/private/fastcgireader.hpp
+    src/private/fastcgistructures.hpp
+    src/private/fastcgithreadobject.cpp
+    src/private/fastcgithreadobject.hpp
+    src/private/fastcgitransport.cpp
+    src/private/fastcgitransport.hpp
+    src/private/fastcgiwriter.cpp
+    src/private/fastcgiwriter.hpp
+    src/private/localserver.cpp
+    src/private/localserver.hpp
     src/private/crc32.h
     src/private/adler32.h
 )
@@ -104,5 +117,7 @@ add_unittest(NAME tst_httpmultipartreader QT Network NURIA NuriaNetwork)
 add_unittest(NAME tst_httpurlencodedreader QT Network NURIA NuriaNetwork)
 add_unittest(NAME tst_httpparser QT Network NURIA NuriaNetwork)
 add_unittest(NAME tst_httpwriter QT Network NURIA NuriaNetwork)
+add_unittest(NAME tst_fastcgireader QT Network NURIA NuriaNetwork)
+add_unittest(NAME tst_fastcgiwriter QT Network NURIA NuriaNetwork)
 add_unittest(NAME tst_restfulhttpnode QT Network NURIA NuriaNetwork
              SOURCES httpmemorytransport.cpp httpmemorytransport.hpp testnode.hpp)
