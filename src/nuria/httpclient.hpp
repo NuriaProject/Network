@@ -701,6 +701,23 @@ public:
 	 */
 	bool atEnd () const override;
 	
+	/**
+	 * Initializes the HttpClient instance.
+	 * 
+	 * This function is only intended for use within HttpTransports which
+	 * get the HTTP header in a already parsed fashion to initialize
+	 * HttpClient instances without having to assemble new ones.
+	 * 
+	 * If you're not implementing a HttpTransport, then you'll probably
+	 * never need this function.
+	 * 
+	 * Returns \c true on success. On failure, the client will be closed.
+	 * The HttpTransport must be able to receive data through its
+	 * sendToRemote() function already when this function is called, as
+	 * the HttpClient will start to process the data right away.
+	 */
+	bool manualInit (HttpVerb verb, HttpVersion version, const QByteArray &path, const HeaderMap &headers);
+	
 	// 
 	qint64 bytesAvailable () const override;
 	qint64 pos () const override;
@@ -836,6 +853,7 @@ private:
 	bool filterData (QByteArray &data);
 	bool filterHeaders (HeaderMap &headers);
 	void addNameToTransferEncoding (HeaderMap &headers, const QByteArray &name);
+	void initPath (QByteArray path);
 	
 	/**
 	 * Sends a chunk of the pipeToClient() device to the client.

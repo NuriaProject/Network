@@ -303,6 +303,17 @@ bool Nuria::HttpClient::readAllAvailableHeaderLines (QByteArray &data) {
 	return true;
 }
 
+void Nuria::HttpClient::initPath (QByteArray path) {
+	if (this->d_ptr->transport->isSecure ()) {
+		path.prepend ("https://localhost");
+	} else {
+		path.prepend ("http://localhost");
+	}
+	
+	// 
+	this->d_ptr->path = QUrl::fromEncoded (path);	
+}
+
 bool Nuria::HttpClient::readFirstLine (const QByteArray &line) {
 	HttpParser parser;
 	
@@ -313,14 +324,7 @@ bool Nuria::HttpClient::readFirstLine (const QByteArray &line) {
 					     path, this->d_ptr->requestVersion);
 	
 	// 
-	if (this->d_ptr->transport->isSecure ()) {
-		path.prepend ("https://localhost");
-	} else {
-		path.prepend ("http://localhost");
-	}
-	
-	// 
-	this->d_ptr->path = QUrl::fromEncoded (path);
+	initPath(path);
 	return success;
 }
 
@@ -1378,6 +1382,21 @@ bool Nuria::HttpClient::atEnd () const {
 	}
 	
 	return this->d_ptr->bufferDevice->atEnd ();
+}
+
+bool Nuria::HttpClient::manualInit (HttpVerb verb, HttpVersion version, const QByteArray &path,
+                                    const HeaderMap &headers) {
+	if (this->d_ptr->headerReady) {
+		return false;
+	}
+	
+	// Store the variables and start processing
+	initPath (path);
+	this->d_ptr->requestHeaders = headers;
+	this->d_ptr->requestType = verb;
+	this->d_ptr->requestVersion = version;
+	this->d_ptr->headerReady = true;
+	return postProcessRequestHeader ();
 }
 
 qint64 Nuria::HttpClient::bytesAvailable () const {

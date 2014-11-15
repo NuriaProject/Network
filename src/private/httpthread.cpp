@@ -38,11 +38,13 @@ void Nuria::Internal::HttpThread::incrementRunning () {
 }
 
 void Nuria::Internal::HttpThread::transportDestroyed () {
-	this->m_running.fetchAndSubRelaxed (1);
+//	this->m_running.fetchAndSubRelaxed (1);
 	
-	if (this->m_stop.load () == 1) {
+	if (!this->m_running.deref () && this->m_stop.load () == 1) {
+		exit ();
 		deleteLater ();
 	}
+	
 }
 
 void Nuria::Internal::HttpThread::stopGraceful () {

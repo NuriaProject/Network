@@ -27,10 +27,7 @@
 #endif
 
 namespace Nuria {
-
 namespace Internal {
-
-class HttpTcpBackend;
 
 class TcpServer : public QTcpServer {
 	Q_OBJECT
@@ -68,8 +65,8 @@ private:
 #endif
 	
 };
-}
 
+}
 }
 
 #endif // NURIA_INTERNAL_TCPSERVER_HPP

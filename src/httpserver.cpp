@@ -60,6 +60,23 @@ Nuria::HttpServer::HttpServer (QObject *parent)
 }
 
 Nuria::HttpServer::~HttpServer () {
+	
+	// Stop all threads
+	for (int i = 0; i < this->d_ptr->threads.length (); i++) {
+		this->d_ptr->threads.at (i)->stopGraceful ();
+	}
+	
+	// Wait for all threads
+//	for (int i = 0; i < this->d_ptr->threads.length (); i++) {
+//		this->d_ptr->threads.at (i)->wait ();
+//	}
+	
+	// Delete all backends while we're still here
+	for (int i = 0; i < this->d_ptr->backends.length (); i++) {
+		delete this->d_ptr->backends.at (i);
+	}
+	
+	// 
 	delete this->d_ptr;
 }
 
