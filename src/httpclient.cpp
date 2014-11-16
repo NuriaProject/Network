@@ -1127,7 +1127,7 @@ bool Nuria::HttpClient::filterHeaders (HeaderMap &headers) {
 		// 
 		QByteArray name = filter->filterName ();
 		if (!name.isEmpty ()) {
-			addNameToTransferEncoding (headers, name);
+			addFilterNameToHeader (headers, name);
 		}
 		
 		// 
@@ -1141,8 +1141,8 @@ bool Nuria::HttpClient::filterHeaders (HeaderMap &headers) {
 	return true;
 }
 
-void Nuria::HttpClient::addNameToTransferEncoding (HeaderMap &headers, const QByteArray &name) {
-	QByteArray value = headers.value (httpHeaderName (HeaderTransferEncoding));
+void Nuria::HttpClient::addFilterNameToHeader (HeaderMap &headers, const QByteArray &name) {
+	QByteArray value = headers.value (httpHeaderName (HeaderContentEncoding));
 	if (value.isEmpty ()) {
 		value = name;
 	} else {
@@ -1150,7 +1150,7 @@ void Nuria::HttpClient::addNameToTransferEncoding (HeaderMap &headers, const QBy
 		value.append (name);
 	}
 	
-	headers.replace (httpHeaderName (HeaderTransferEncoding), value);
+	headers.replace (httpHeaderName (HeaderContentEncoding), value);
 }
 
 void Nuria::HttpClient::forceClose () {

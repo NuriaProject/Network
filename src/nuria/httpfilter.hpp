@@ -50,7 +50,11 @@ public:
 	 * in the "Accept-Encoding" HTTP header.
 	 * 
 	 * Also, if a non-empty QByteArray is returned, it will automatically
-	 * be added to the "Transfer-Encoding" header upon sending.
+	 * be added to the "Content-Encoding" header upon sending.
+	 * 
+	 * \note The correct header would be "Transfer-Encoding" for HTTP/1.1
+	 * requests, but the world doesn't care so we use "Content-Encoding" to
+	 * be compliant with everyone else.
 	 * 
 	 * The default implementation returns an empty QByteArray.
 	 */

@@ -230,7 +230,7 @@ private slots:
 	void verifyChunkedTransfer ();
 	void verifyBuffered ();
 	void verifyKeepAliveBehaviour ();
-	void filterIsAddedToTransferEncoding ();
+	void filterIsAddedToContentEncoding ();
 	void verifyGzipFilter ();
 	void verifyDeflateFilter ();
 	
@@ -643,13 +643,13 @@ void HttpClientTest::verifyKeepAliveBehaviour () {
 	
 }
 
-void HttpClientTest::filterIsAddedToTransferEncoding () {
+void HttpClientTest::filterIsAddedToContentEncoding () {
 	QByteArray input = "GET /filter HTTP/1.0\r\n\r\n";
 	QByteArray expected = "HTTP/1.0 200 OK\r\n"
 	                      "Connection: close\r\n"
 	                      "Foo: bar\r\n"
 	                      "Nuria: project\r\n"
-	                      "Transfer-Encoding: rot\r\n\r\n"
+	                      "Content-Encoding: rot\r\n\r\n"
 	                      "rev\r\nbegin\r\ngfedcb\r\nver\r\nend";
 	
 	// 
@@ -664,7 +664,7 @@ void HttpClientTest::verifyGzipFilter () {
 	QByteArray input = "GET /gzip HTTP/1.0\r\n\r\n";
 	static const char data[] = "HTTP/1.0 200 OK\r\n"
 	                           "Connection: close\r\n"
-	                           "Transfer-Encoding: gzip\r\n\r\n"
+	                           "Content-Encoding: gzip\r\n\r\n"
 	                           "\x1f\x8b\x08\x00\x00\x00\x00\x00"
 	                           "\x00\xff\xf3\x2b\x2d\xca\x4c\x0c"
 	                           "\x28\xca\xcf\x4a\x4d\x2e\x01\x00"
@@ -682,7 +682,7 @@ void HttpClientTest::verifyDeflateFilter () {
 	QByteArray input = "GET /deflate HTTP/1.0\r\n\r\n";
 	static const char data[] = "HTTP/1.0 200 OK\r\n"
 	                           "Connection: close\r\n"
-	                           "Transfer-Encoding: deflate\r\n\r\n"
+	                           "Content-Encoding: deflate\r\n\r\n"
 	                           "\x78\x9c\xf3\x2b\x2d\xca\x4c\x0c"
 	                           "\x28\xca\xcf\x4a\x4d\x2e\x01\x00"
 	                           "\x1f\x00\x04\xd7";

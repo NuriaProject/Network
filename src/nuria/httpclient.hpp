@@ -101,9 +101,12 @@ class SlotInfo;
  * schemes are provided by the framework. Custom filters can be written by
  * sub-classing HttpFilter.
  * 
- * \warning You should be aware of the BREACH attack, which targets SSL
+ * \warning You should be aware of the BREACH attack, which targets
  * encrypted and compressed transmissions. Please see:
  * http://en.wikipedia.org/wiki/BREACH_%28security_exploit%29
+ * 
+ * \warning Also as general note, use TLS. Do not use SSL. SSL is completely
+ * broken as in: unsecure.
  * 
  * \note It is recommended to use "gzip" over "deflate" as deflate has severe
  * browser compatibility issues.
@@ -852,7 +855,7 @@ private:
 	QByteArray filterDeinit ();
 	bool filterData (QByteArray &data);
 	bool filterHeaders (HeaderMap &headers);
-	void addNameToTransferEncoding (HeaderMap &headers, const QByteArray &name);
+	void addFilterNameToHeader (HeaderMap &headers, const QByteArray &name);
 	void initPath (QByteArray path);
 	
 	/**
