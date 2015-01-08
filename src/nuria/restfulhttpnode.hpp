@@ -53,7 +53,10 @@ class MetaObject;
  * \par Usage of this class
  * To expose your own service in a RESTful manner, all you need to do is to
  * sub-class this class and tag it with NURIA_INTROSPECT as usual for Tria
- * to pick up annotations.
+ * to pick up annotations. Also make sure that the Q_OBJECT macro is in place.
+ * 
+ * \warning Not doing so will output an error message and likely crash the
+ * application.
  * 
  * If you don't want to sub-class RestfulHttpNode, you can use the constructor
  * which takes a object pointer and a MetaObject instance.

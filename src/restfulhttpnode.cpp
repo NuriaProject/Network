@@ -253,6 +253,7 @@ void Nuria::RestfulHttpNode::registerAnnotatedHandlers () {
 	if (!this->d_ptr->metaObject) {
 		this->d_ptr->metaObject = MetaObject::byName (metaObject ()->className ());
 		if (!this->d_ptr->metaObject) {
+			nError() << "Failed to auto-find meta object of class" << metaObject ()->className ();
 			return;
 		}
 		
