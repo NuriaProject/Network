@@ -17,9 +17,11 @@
 #ifndef NURIA_INTERNAL_HTTPTHREAD_HPP
 #define NURIA_INTERNAL_HTTPTHREAD_HPP
 
+#include "../nuria/httptransport.hpp"
 #include <QThread>
 
 namespace Nuria {
+class HttpTransport;
 class HttpServer;
 
 namespace Internal {
@@ -31,7 +33,7 @@ public:
 	explicit HttpThread (HttpServer *server = 0);
 	~HttpThread () override;
 	
-	void incrementRunning ();
+	void incrementRunning (HttpTransport *transport);
 	void transportDestroyed ();
 	
 public slots:
@@ -39,6 +41,9 @@ public slots:
 	// Waits for the currently processed request to be completed and
 	// deletes the thread itself afterwards.
 	void stopGraceful ();
+	
+private slots:
+	void forwardTimeout (Nuria::HttpTransport::Timeout mode);
 	
 private:
 	QAtomicInt m_running;

@@ -42,6 +42,12 @@ public:
 	int threadIndex = 0;
 	int activeThreads = 0;
 	
+	// 
+	int timeoutConnect = HttpTransport::DefaultConnectTimeout;
+	int timeoutData = HttpTransport::DefaultDataTimeout;
+	int timeoutKeepAlive = HttpTransport::DefaultKeepAliveTimeout;
+	int minBytesReceived = HttpTransport::DefaultMinimalBytesReceived;
+	
 };
 }
 
@@ -50,6 +56,8 @@ Nuria::HttpServer::HttpServer (QObject *parent)
 {
 	
 	// Register meta types
+	qRegisterMetaType< HttpTransport::Timeout > ();
+	qRegisterMetaType< HttpTransport * > ();
 	qRegisterMetaType< HttpClient * > ();
 	
 	// Create root node
@@ -162,6 +170,39 @@ void Nuria::HttpServer::setMaxThreads (int amount) {
 	this->d_ptr->activeThreads = amount;
 }
 
+int Nuria::HttpServer::timeout (HttpTransport::Timeout which) {
+	switch (which) {
+	case HttpTransport::ConnectTimeout: return this->d_ptr->timeoutConnect;
+	case HttpTransport::DataTimeout: return this->d_ptr->timeoutData;
+	case HttpTransport::KeepAliveTimeout: return this->d_ptr->timeoutKeepAlive;
+	}
+	
+	return 0;
+}
+
+void Nuria::HttpServer::setTimeout (HttpTransport::Timeout which, int msec) {
+	switch (which) {
+	case HttpTransport::ConnectTimeout:
+		this->d_ptr->timeoutConnect = msec;
+		break;
+	case HttpTransport::DataTimeout:
+		this->d_ptr->timeoutData = msec;
+		break;
+	case HttpTransport::KeepAliveTimeout:
+		this->d_ptr->timeoutKeepAlive = msec;
+		break;
+	}
+	
+}
+
+int Nuria::HttpServer::minimalBytesReceived () const {
+	return this->d_ptr->minBytesReceived;
+}
+
+void Nuria::HttpServer::setMinimalBytesReceived (int bytes) {
+	this->d_ptr->minBytesReceived = bytes;
+}
+
 bool Nuria::HttpServer::invokeByPath (HttpClient *client, const QString &path) {
 	
 	// Split the path.
@@ -196,7 +237,10 @@ bool Nuria::HttpServer::addTcpServerBackend (Internal::TcpServer *server, const 
 }
 
 bool Nuria::HttpServer::addTransport (HttpTransport *transport) {
+	
 	if (this->d_ptr->activeThreads < 1 || this->thread () != transport->thread ()) {
+		connect (transport, SIGNAL(connectionTimedout(Nuria::HttpTransport::Timeout)),
+		         this, SLOT(forwardTimeout(Nuria::HttpTransport::Timeout)));
 		return false;
 	}
 	
@@ -209,7 +253,7 @@ bool Nuria::HttpServer::addTransport (HttpTransport *transport) {
 	Internal::HttpThread *thread = this->d_ptr->threads.at (index);
 	transport->setParent (nullptr);
 	transport->moveToThread (thread);
-	thread->incrementRunning ();
+	thread->incrementRunning (transport);
 	connect (transport, &QObject::destroyed,
 	         thread, &Internal::HttpThread::transportDestroyed);
 	
@@ -269,6 +313,14 @@ void Nuria::HttpServer::threadStopped (QObject *obj) {
 	int idx = this->d_ptr->threads.indexOf (static_cast< Internal::HttpThread * > (obj));
 	if (idx != -1) {
 		this->d_ptr->threads.removeAt (idx);
+	}
+	
+}
+
+void Nuria::HttpServer::forwardTimeout (Nuria::HttpTransport::Timeout mode) {
+	HttpTransport *transport = qobject_cast< HttpTransport * > (sender ());
+	if (transport) {
+		emit connectionTimedout (transport, mode);
 	}
 	
 }

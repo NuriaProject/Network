@@ -70,6 +70,9 @@ public:
 		/** Default value for KeepAliveTimeout. In msec. */
 		DefaultKeepAliveTimeout = 30000,
 		
+		/** Default value for minimalBytesReceived() in bytes. */
+		DefaultMinimalBytesReceived = 512,
+		
 	};
 	
 	/** Transport types. */
@@ -183,6 +186,19 @@ public:
 	/** Sets the timeout \a which to \a msec. */
 	void setTimeout (Timeout which, int msec);
 	
+	/**
+	 * Returns the amount of bytes to be minimal received from the client in
+	 * the last \c timeout(DataTimeout) milliseconds. Depending on the
+	 * implementation, the maximum timeout could be twice the set timeout
+	 * time.
+	 * 
+	 * The default is \c 512.
+	 */
+	int minimalBytesReceived () const;
+	
+	/** Sets the minimal bytes received amount. */
+	void setMinimalBytesReceived (int bytes);
+	
 	/** Returns the HttpBackend associated with this transport. */
 	HttpBackend *backend ();
 	
@@ -217,6 +233,12 @@ signals:
 	
 	/** The value of \a timeout has been changed to \a msec. */
 	void timeoutChanged (Timeout timeout, int msec);
+	
+	/**
+	 * Emitted when connection timed out in \a mode. After this signal was
+	 * emitted, the connection is closed and thus destroyed.
+	 */
+	void connectionTimedout (Nuria::HttpTransport::Timeout mode);
 	
 protected:
 	
@@ -264,6 +286,7 @@ private:
 
 }
 
-Q_DECLARE_METATYPE(Nuria::HttpTransport::Timeout)
+Q_DECLARE_METATYPE(Nuria::HttpTransport::Timeout);
+Q_DECLARE_METATYPE(Nuria::HttpTransport*);
 
 #endif // NURIA_HTTPTRANSPORT_HPP

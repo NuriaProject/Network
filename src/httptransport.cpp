@@ -31,6 +31,8 @@ public:
 	int timeoutData = HttpTransport::DefaultDataTimeout;
 	int timeoutKeepAlive = HttpTransport::DefaultKeepAliveTimeout;
 	
+	int minBytesReceived = HttpTransport::DefaultMinimalBytesReceived;
+	
 	HttpBackend *backend;
 	
 };
@@ -41,6 +43,10 @@ Nuria::HttpTransport::HttpTransport (HttpBackend *backend, HttpServer *server)
 {
 	
 	this->d_ptr->backend = backend;
+	this->d_ptr->timeoutConnect = server->timeout (ConnectTimeout);
+	this->d_ptr->timeoutData = server->timeout (DataTimeout);
+	this->d_ptr->timeoutKeepAlive = server->timeout (KeepAliveTimeout);
+	this->d_ptr->minBytesReceived = server->minimalBytesReceived ();
 	
 }
 
@@ -108,6 +114,14 @@ void Nuria::HttpTransport::setTimeout (HttpTransport::Timeout which, int msec) {
 	}
 	
 	emit timeoutChanged (which, msec);
+}
+
+int Nuria::HttpTransport::minimalBytesReceived () const {
+	return this->d_ptr->minBytesReceived;
+}
+
+void Nuria::HttpTransport::setMinimalBytesReceived (int bytes) {
+	this->d_ptr->minBytesReceived = bytes;
 }
 
 Nuria::HttpBackend *Nuria::HttpTransport::backend () {

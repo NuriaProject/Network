@@ -35,8 +35,13 @@ public:
 	QSslSocket *sslSocket = nullptr;
 	HttpClient *curClient = nullptr;
 	HttpServer *server;
+	
+	HttpTransport::Timeout timeoutMode = HttpTransport::ConnectTimeout;
 	int timeoutTimer = -1;
 	int bytesReceived = 0;
+	int bytesReceivedLast = 0;
+	bool notReceivedData = false;
+	
 	QByteArray buffer;
 	
 };
@@ -146,13 +151,27 @@ bool Nuria::Internal::HttpTcpTransport::sendToRemote (HttpClient *client, const 
 }
 
 void Nuria::Internal::HttpTcpTransport::timerEvent (QTimerEvent *) {
-#ifdef QT_DEBUG
-	nDebug() << "Connection to" << this->d_ptr->socket->peerAddress () << "timed out - Closing.";
-#endif
+	if (this->d_ptr->timeoutMode == DataTimeout && checkDataTimeout ()) {
+		return;
+	}
 	
 	// 
+	emit connectionTimedout (this->d_ptr->timeoutMode);
 	forceClose ();
 	
+}
+
+bool Nuria::Internal::HttpTcpTransport::checkDataTimeout () {
+	bool received = (this->d_ptr->bytesReceived > this->d_ptr->bytesReceivedLast + minimalBytesReceived ());
+	this->d_ptr->bytesReceivedLast = this->d_ptr->bytesReceived;
+	
+	// Check if client sent enough data over the course of the last 2*timeout msec.
+	if (received || (!received && !this->d_ptr->notReceivedData)) {
+		this->d_ptr->notReceivedData = !received;
+		return true;
+	}
+	
+	return false;
 }
 
 void Nuria::Internal::HttpTcpTransport::clientDestroyed (QObject *object) {
@@ -178,6 +197,7 @@ void Nuria::Internal::HttpTcpTransport::processData (QByteArray &data) {
 	}
 	
 	// Process ...
+	this->d_ptr->bytesReceived += data.length ();
 	readFromRemote (this->d_ptr->curClient, data);
 	
 	// 
@@ -216,8 +236,6 @@ void Nuria::Internal::HttpTcpTransport::dataReceived () {
 void Nuria::Internal::HttpTcpTransport::clientDisconnected () {
 	if (this->d_ptr->curClient) {
 		this->d_ptr->curClient->close ();
-		this->d_ptr->curClient->deleteLater ();
-		this->d_ptr->curClient = nullptr;
 	}
 	
 	// Destroy this transport
@@ -293,11 +311,11 @@ bool Nuria::Internal::HttpTcpTransport::wasLastRequest () {
 	return (maxRequests () >= 0 && currentRequestCount () >= maxRequests ());
 }
 
-void Nuria::Internal::HttpTcpTransport::startTimeout (HttpTransport::Timeout mode) {
-	return;
+void Nuria::Internal::HttpTcpTransport::startTimeout (Timeout mode) {
 	killTimeout ();
 	
 	// Start new timer
+	this->d_ptr->timeoutMode = mode;
 	int msec = timeout (mode);
 	if (msec >= 0) {
 		this->d_ptr->timeoutTimer = startTimer (msec);

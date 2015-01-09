@@ -61,6 +61,7 @@ protected:
 	void timerEvent (QTimerEvent *) override;
 	
 private:
+	bool checkDataTimeout ();
 	void clientDestroyed (QObject *object);
 	void bytesWritten (qint64 bytes);
 	void processData (QByteArray &data);

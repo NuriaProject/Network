@@ -121,3 +121,4 @@ add_unittest(NAME tst_fastcgireader QT Network NURIA NuriaNetwork)
 add_unittest(NAME tst_fastcgiwriter QT Network NURIA NuriaNetwork)
 add_unittest(NAME tst_restfulhttpnode QT Network NURIA NuriaNetwork
              SOURCES httpmemorytransport.cpp httpmemorytransport.hpp testnode.hpp)
+add_unittest(NAME tst_httptcptransport QT Network NURIA NuriaNetwork)

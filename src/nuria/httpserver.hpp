@@ -18,6 +18,7 @@
 #define NURIA_HTTPSERVER_HPP
 
 #include "network_global.hpp"
+#include "httptransport.hpp"
 #include <QSslCertificate>
 #include <QHostAddress>
 #include <QObject>
@@ -28,7 +29,6 @@ class QTcpServer;
 namespace Nuria {
 namespace Internal { class TcpServer; }
 class HttpServerPrivate;
-class HttpTransport;
 class HttpBackend;
 class HttpClient;
 class HttpNode;
@@ -67,6 +67,12 @@ class HttpNode;
  * thread-safe.
  * 
  * Tip: You can use DependencyManager to manage resources
+ * 
+ * \par Connection time-outs
+ * 
+ * The HTTP implementation offers a built-in time-out detection for connections.
+ * Exact timings can be controlled using the setTimeout() method.
+ * 
  */
 class NURIA_NETWORK_EXPORT HttpServer : public QObject {
 	Q_OBJECT
@@ -160,6 +166,36 @@ public:
 	 * the affected will be processed, after which they're destroyed.
 	 */
 	void setMaxThreads (int amount);
+	
+	/**
+	 * Returns the timeout time for \a which in msec.
+	 * A value of \c -1 disables the timeout.
+	 */
+	int timeout (HttpTransport::Timeout which);
+	
+	/** Sets the timeout \a which to \a msec. */
+	void setTimeout (HttpTransport::Timeout which, int msec);
+	
+	/**
+	 * Returns the amount of bytes to be minimal received from the client in
+	 * the last \c timeout(DataTimeout) milliseconds. Depending on the
+	 * implementation, the maximum timeout could be twice the set timeout
+	 * time.
+	 * 
+	 * The default is \c 512.
+	 */
+	int minimalBytesReceived () const;
+	
+	/** Sets the minimal bytes received amount. */
+	void setMinimalBytesReceived (int bytes);
+	
+signals:
+	
+	/** Emitted when \a transport timed out because in \a mode. */
+	void connectionTimedout (Nuria::HttpTransport *transport, Nuria::HttpTransport::Timeout mode);
+	
+private slots:
+	void forwardTimeout (Nuria::HttpTransport::Timeout mode);
 	
 private:
 	friend class HttpTransport;
