@@ -647,9 +647,9 @@ void HttpClientTest::filterIsAddedToContentEncoding () {
 	QByteArray input = "GET /filter HTTP/1.0\r\n\r\n";
 	QByteArray expected = "HTTP/1.0 200 OK\r\n"
 	                      "Connection: close\r\n"
+	                      "Content-Encoding: rot\r\n"
 	                      "Foo: bar\r\n"
-	                      "Nuria: project\r\n"
-	                      "Content-Encoding: rot\r\n\r\n"
+	                      "Nuria: project\r\n\r\n"
 	                      "rev\r\nbegin\r\ngfedcb\r\nver\r\nend";
 	
 	// 
