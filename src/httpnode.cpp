@@ -442,7 +442,7 @@ bool Nuria::HttpNode::sendStaticResource (const QStringList &path, int indexInPa
 	setMimeTypeHeaderForStaticResource (client, file, handle);
 	
 	// Is the client only interested in a specific range?
-	if (client->rangeStart () != -1) {
+	if (client->rangeStart () >= 0) {
 		qint64 start = client->rangeStart ();
 		qint64 end = client->rangeEnd ();
 		
@@ -450,6 +450,10 @@ bool Nuria::HttpNode::sendStaticResource (const QStringList &path, int indexInPa
 		if (!handle->seek (start)) {
 			client->killConnection (416);
 			return false;
+		}
+		
+		if (end < 0) {
+			end = handle->bytesAvailable ();
 		}
 		
 		maxLen = end - start;

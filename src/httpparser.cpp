@@ -166,7 +166,7 @@ bool Nuria::HttpParser::parseRangeHeaderValue (const QByteArray &value, qint64 &
 	int endLength = value.length () - beginOfEnd;
 	
 	// Sanity check
-	if (endOfBegin == -1 || beginLength < 1 || endLength < 1) {
+	if (endOfBegin == -1 || beginLength < 1 || endLength < 0) {
 		return false;
 	}
 	
@@ -178,10 +178,16 @@ bool Nuria::HttpParser::parseRangeHeaderValue (const QByteArray &value, qint64 &
 	bool beginOk = false;
 	bool endOk = false;
 	begin = beginData.toLongLong (&beginOk);
-	end = endData.toLongLong (&endOk);
+	
+	if (endLength > 0) {
+		end = endData.toLongLong (&endOk);
+	} else {
+		end = -1;
+		endOk = true;
+	}
 	
 	// Done.
-	return (beginOk && endOk && begin >= 0 && end >= 0 && begin < end);
+	return (beginOk && endOk && begin >= 0 && end >= -1 && (begin < end || begin >= 0 && end == -1));
 }
 
 QByteArray Nuria::HttpParser::correctHeaderKeyCase (QByteArray key) {
