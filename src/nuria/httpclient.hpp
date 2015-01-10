@@ -777,6 +777,16 @@ public slots:
 	 */
 	void forceClose ();
 	
+	/**
+	 * Sets the internal \a path and tries to invoke it, as if the client
+	 * had requested it. This can be used for URL rewrite operations.
+	 * Returns \c true if the call was successful.
+	 * 
+	 * \note After this, path() will return the new path. The original one
+	 * is not available anymore.
+	 */
+	bool invokePath (const QString &path);
+	
 private slots:
 	
 	/** The client has disconnected. */
@@ -793,18 +803,6 @@ protected:
 	/** Implementation of QIODevice::writeData. */
 	virtual qint64 writeData (const char *data, qint64 len);
 	
-	/**
-	 * Resolves the URL from the client. That means that the code tries
-	 * to find the associated slot of \a url and calls it if possible.
-	 * Returns \c true on success.
-	 */
-	bool resolveUrl (const QUrl &url);
-	
-	/**
-	 * Takes care of buffering the POST body.
-	 */
-	bool bufferPostBody (QByteArray &data);
-	
 private:
 	friend class HttpTransport;
 	friend class HttpServer;
@@ -814,6 +812,8 @@ private:
 	 * Parses the request headers. Returns \c true on success.
 	 */
 	bool readRangeRequestHeader ();
+	bool resolveUrl (const QUrl &url);
+	bool bufferPostBody (QByteArray &data);
 	
 	/**
 	 * Reads the cookies from the request headers if not already done.

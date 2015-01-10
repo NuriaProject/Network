@@ -1156,6 +1156,11 @@ void Nuria::HttpClient::forceClose () {
 	this->d_ptr->transport->forceClose ();
 }
 
+bool Nuria::HttpClient::invokePath (const QString &path) {
+	this->d_ptr->path.setPath (path);
+	return this->d_ptr->server->invokeByPath (this, path);
+}
+
 bool Nuria::HttpClient::isSequential () const {
 	return !this->d_ptr->bufferDevice->inherits ("TemporaryBufferDevice");
 }

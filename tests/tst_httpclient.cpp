@@ -184,6 +184,9 @@ bool TestNode::invokePath (const QString &path, const QStringList &parts,
 		client->addFilter (new RotFilter (client));
 		client->write ("abcdef");
 		
+	} else if (path == "/rewrite") {
+		return client->invokePath ("/rewritten");
+		
 	} else if (path == "/redirect/keep") {
 		client->redirectClient ("/nuria", HttpClient::RedirectMode::Keep);
 		
@@ -239,6 +242,8 @@ private slots:
 	
 	void verifyClientPath_data ();
 	void verifyClientPath ();
+	
+	void testInvokePath ();
 	
 	void redirectClientLocal_data ();
 	void redirectClientLocal ();
@@ -742,6 +747,22 @@ void HttpClientTest::verifyClientPath () {
 	// 
 	QCOMPARE(client->path ().toString (), url);
 	
+}
+
+void HttpClientTest::testInvokePath () {
+	QByteArray input = "GET /rewrite HTTP/1.0\r\n\r\n";
+	QByteArray expected = "HTTP/1.0 200 OK\r\n"
+	                      "Connection: close\r\n"
+	                      "Content-Length: 10\r\n\r\n"
+                              "/rewritten";
+	
+	QTest::ignoreMessage (QtDebugMsg, "/rewritten");
+	QTest::ignoreMessage (QtDebugMsg, "close()");
+	HttpClient *client = createClient (input);
+	HttpMemoryTransport *transport = getTransport (client);
+	
+	QCOMPARE(transport->outData, expected);
+	QCOMPARE(client->path ().path (), QString ("/rewritten"));
 }
 
 void HttpClientTest::redirectClientLocal_data () {
