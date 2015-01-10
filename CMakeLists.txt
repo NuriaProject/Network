@@ -43,6 +43,8 @@ SET(NuriaNetwork_SRC
     src/nuria/network_global.hpp
     src/restfulhttpnode.cpp
     src/nuria/restfulhttpnode.hpp
+    src/rewritehttpnode.cpp
+    src/nuria/rewritehttpnode.hpp
     src/httpbackend.cpp
     src/nuria/httpbackend.hpp
     src/sslserver.cpp
@@ -121,4 +123,6 @@ add_unittest(NAME tst_fastcgireader QT Network NURIA NuriaNetwork)
 add_unittest(NAME tst_fastcgiwriter QT Network NURIA NuriaNetwork)
 add_unittest(NAME tst_restfulhttpnode QT Network NURIA NuriaNetwork
              SOURCES httpmemorytransport.cpp httpmemorytransport.hpp testnode.hpp)
+add_unittest(NAME tst_rewritehttpnode QT Network NURIA NuriaNetwork
+             SOURCES httpmemorytransport.cpp httpmemorytransport.hpp)
 add_unittest(NAME tst_httptcptransport QT Network NURIA NuriaNetwork)
