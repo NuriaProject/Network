@@ -205,17 +205,6 @@ bool Nuria::HttpClient::readPostBodyContentLength () {
 		return false;
 	}
 	
-	// Check if the client wants to send too much data.
-	qint64 maxContentLength = 1024 * 1024 * 4;
-	if (this->d_ptr->slotInfo.isValid ()) {
-		maxContentLength = this->d_ptr->slotInfo.maxBodyLength ();
-	}
-	
-	if (this->d_ptr->postBodyLength > maxContentLength) {
-		killConnection (413);
-		return false;
-	}
-	
 	// Everything is fine
 	return true;
 }
