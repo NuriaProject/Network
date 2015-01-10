@@ -67,7 +67,7 @@ class RewriteHttpNodePrivate;
  * 
  * You can sub-class RewriteHttpNode to override these functions.
  */
-class RewriteHttpNode : public HttpNode {
+class NURIA_NETWORK_EXPORT RewriteHttpNode : public HttpNode {
 	Q_OBJECT
 public:
 	

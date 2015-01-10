@@ -47,7 +47,7 @@ class FastCgiTransport;
  * 
  * FastCGI front-end servers pass "parameters" to FastCGI applications to tell
  * them about incoming connections. These are comparable to environment
- * variables or HTTP headers.
+ * variables or HTTP headers.Hello World
  * 
  * The following parameters are needed by FastCgiBackend:
  * 
@@ -89,7 +89,7 @@ class FastCgiTransport;
  * HTTP proxy and relying on the NuriaFrameworks HTTP implementation.
  * 
  */
-class FastCgiBackend : public HttpBackend {
+class NURIA_NETWORK_EXPORT FastCgiBackend : public HttpBackend {
 	Q_OBJECT
 public:
 	
