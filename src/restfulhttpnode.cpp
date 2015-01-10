@@ -125,7 +125,7 @@ QVariant Nuria::RestfulHttpNode::serializeVariant (const QVariant &variant) {
 	}
 	
 	// POD types
-	if ((type >= QMetaType::Bool && type <= QMetaType::ULongLong) ||
+	if ((type >= QMetaType::Bool && type <= QMetaType::Double) ||
 	    (type >= QMetaType::Long && type <= QMetaType::Float)) {
 		return variant;
 	}
