@@ -23,10 +23,6 @@
 #include <QTimer>
 #include <QDir>
 
-// We need gmtime_r and snprintf
-#include <cstring>
-#include <ctime>
-
 #include <nuria/temporarybufferdevice.hpp>
 #include "nuria/httpurlencodedreader.hpp"
 #include "nuria/httpmultipartreader.hpp"
@@ -35,10 +31,12 @@
 #include "nuria/httpparser.hpp"
 #include "nuria/httpserver.hpp"
 #include "nuria/httpwriter.hpp"
+#include "nuria/websocket.hpp"
 #include "nuria/httpnode.hpp"
 #include <nuria/debug.hpp>
 
 #include "private/standardfilters.hpp"
+#include "private/websocketreader.hpp"
 #include "private/httpprivate.hpp"
 
 Nuria::HttpClient::HttpClient (HttpTransport *transport, HttpServer *server)
@@ -699,7 +697,8 @@ bool Nuria::HttpClient::bufferPostBody (QByteArray &data) {
 	
 	// Determine how much to read
 	int toRead = data.length ();
-	if (this->d_ptr->postBodyTransferred + toRead > this->d_ptr->postBodyLength) {
+	if (this->d_ptr->postBodyLength >= 0 &&
+	    this->d_ptr->postBodyTransferred + toRead > this->d_ptr->postBodyLength) {
 		if (this->d_ptr->connectionMode == ConnectionClose) {
 			killConnection (413);
 			return false;
@@ -1392,6 +1391,40 @@ bool Nuria::HttpClient::manualInit (HttpVerb verb, HttpVersion version, const QB
 	return postProcessRequestHeader ();
 }
 
+bool Nuria::HttpClient::isWebSocketHandshake () const {
+	return (this->d_ptr->headerReady &&
+	        Internal::WebSocketReader::isWebSocketRequest (this->d_ptr->requestHeaders));
+}
+
+Nuria::WebSocket *Nuria::HttpClient::acceptWebSocketConnection () {
+	if (!isWebSocketHandshake () || this->d_ptr->headerSent) {
+		return nullptr;
+	}
+	
+	// Pipe additional data into the websocket
+	WebSocket *socket = new WebSocket (this);
+	pipeFromPostBody (socket->backendDevice ());
+	setTransferMode (Streaming);
+	setKeepConnectionOpen (true);
+	
+	// Make the HttpClient accept a POST body
+	this->d_ptr->requestType = POST;
+	this->d_ptr->postBodyLength = -1;
+	
+	// Build response headers to complete the handshake.
+	QByteArray key = this->d_ptr->requestHeaders.value (httpHeaderName (HeaderSecWebSocketKey));
+	QByteArray accept = Internal::WebSocketReader::generateHandshakeKey (key);
+	
+	setResponseCode (101); // Switching Protocol
+	this->d_ptr->responseHeaders.replace (httpHeaderName (HeaderUpgrade), QByteArrayLiteral("websocket"));
+	this->d_ptr->responseHeaders.replace (httpHeaderName (HeaderConnection), QByteArrayLiteral("Upgrade"));
+	this->d_ptr->responseHeaders.replace (httpHeaderName (HeaderSecWebSocketAccept), accept);
+	sendResponseHeader ();
+	
+	// Later: Add -Extension and -Protocol WebSocket response headers if needed.
+	return socket;
+}
+
 qint64 Nuria::HttpClient::bytesAvailable () const {
 	return QIODevice::bytesAvailable () + this->d_ptr->bufferDevice->bytesAvailable ();
 }
@@ -1428,8 +1461,11 @@ bool Nuria::HttpClient::sendResponseHeader () {
 	writer.applyRangeHeaders (this->d_ptr->rangeStart, this->d_ptr->rangeEnd,
 				  this->d_ptr->contentLength, this->d_ptr->responseHeaders);
 	writer.addComplianceHeaders (this->d_ptr->requestVersion, this->d_ptr->responseHeaders);
-	writer.addConnectionHeader (this->d_ptr->connectionMode, this->d_ptr->transport->currentRequestCount (),
-	                            this->d_ptr->transport->maxRequests (), this->d_ptr->responseHeaders);
+	
+	if (!this->d_ptr->responseHeaders.contains (httpHeaderName (HttpClient::HeaderConnection))) {
+		writer.addConnectionHeader (this->d_ptr->connectionMode, this->d_ptr->transport->currentRequestCount (),
+		                            this->d_ptr->transport->maxRequests (), this->d_ptr->responseHeaders);
+	}
 	
 	// Apply filters
 	if (!filterHeaders (this->d_ptr->responseHeaders)) {
@@ -1523,6 +1559,10 @@ QByteArray Nuria::HttpClient::httpStatusCodeName (int code) {
 	case 416: return QByteArrayLiteral("Requested Range Not Satisfiable");
 	case 417: return QByteArrayLiteral("Expectation Failed");
 	case 418: return QByteArrayLiteral("I'm a teapot"); // See RFC 2324
+	case 426: return QByteArrayLiteral("Upgrade Required");
+	case 428: return QByteArrayLiteral("Precondition Required");
+	case 429: return QByteArrayLiteral("Too Many Requests");
+	case 431: return QByteArrayLiteral("Request Header Fields Too Large");
 	case 500: return QByteArrayLiteral("Internal Server Error");
 	case 501: return QByteArrayLiteral("Not Implemented");
 	case 502: return QByteArrayLiteral("Bad Gateway");
@@ -1544,6 +1584,9 @@ QByteArray Nuria::HttpClient::httpHeaderName (HttpClient::HttpHeader header) {
 	case HeaderContentType: return QByteArrayLiteral("Content-Type");
 	case HeaderConnection: return QByteArrayLiteral("Connection");
 	case HeaderDate: return QByteArrayLiteral("Date");
+	case HeaderUpgrade: return QByteArrayLiteral("Upgrade");
+	case HeaderSecWebSocketExtensions: return QByteArrayLiteral("Sec-WebSocket-Extensions");
+	case HeaderSecWebSocketProtocol: return QByteArrayLiteral("Sec-WebSocket-Protocol");
 	case HeaderHost: return QByteArrayLiteral("Host");
 	case HeaderUserAgent: return QByteArrayLiteral("User-Agent");
 	case HeaderAccept: return QByteArrayLiteral("Accept");
@@ -1556,6 +1599,9 @@ QByteArray Nuria::HttpClient::httpHeaderName (HttpClient::HttpHeader header) {
 	case HeaderReferer: return QByteArrayLiteral("Referer");
 	case HeaderDoNotTrack: return QByteArrayLiteral("Do-Not-Track");
 	case HeaderExpect: return QByteArrayLiteral("Expect");
+	case HeaderOrigin: return QByteArrayLiteral("Origin");
+	case HeaderSecWebSocketKey: return QByteArrayLiteral("Sec-WebSocket-Key");
+	case HeaderSecWebSocketVersion: return QByteArrayLiteral("Sec-WebSocket-Version");
 	case HeaderContentEncoding: return QByteArrayLiteral("Content-Encoding");
 	case HeaderContentLanguage: return QByteArrayLiteral("Content-Language");
 	case HeaderContentDisposition: return QByteArrayLiteral("Content-Disposition");
@@ -1565,6 +1611,7 @@ QByteArray Nuria::HttpClient::httpHeaderName (HttpClient::HttpHeader header) {
 	case HeaderSetCookie: return QByteArrayLiteral("Set-Cookie");
 	case HeaderTransferEncoding: return QByteArrayLiteral("Transfer-Encoding");
 	case HeaderLocation: return QByteArrayLiteral("Location");
+	case HeaderSecWebSocketAccept: return QByteArrayLiteral("Sec-WebSocket-Accept");
 	};
 	
 	// We should never reach this.

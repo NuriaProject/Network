@@ -201,7 +201,8 @@ void Nuria::Internal::HttpTcpTransport::processData (QByteArray &data) {
 	readFromRemote (this->d_ptr->curClient, data);
 	
 	// 
-	if (this->d_ptr->curClient && this->d_ptr->curClient->requestCompletelyReceived ()) {
+	if (this->d_ptr->curClient &&
+	    (this->d_ptr->curClient->requestCompletelyReceived () || this->d_ptr->curClient->keepConnectionOpen ())) {
 		killTimeout ();
 	}
 	

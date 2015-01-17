@@ -32,6 +32,7 @@ class HttpClientPrivate;
 class HttpTransport;
 class HttpFilter;
 class HttpServer;
+class WebSocket;
 class HttpNode;
 class SlotInfo;
 
@@ -105,7 +106,7 @@ class SlotInfo;
  * http://en.wikipedia.org/wiki/BREACH_%28security_exploit%29
  * 
  * \warning Also as general note, use TLS. Do not use SSL. SSL is completely
- * broken as in: unsecure.
+ * broken since the POODLE attack.
  * 
  * \note It is recommended to use "gzip" over "deflate" as deflate has severe
  * browser compatibility issues.
@@ -113,6 +114,11 @@ class SlotInfo;
  * \warning Filters are \b not owned by the HttpClient instance.
  * 
  * \sa HttpFilter addFilter removeFilter
+ * 
+ * \par WebSockets
+ * HttpClient supports the WebSockets protocol in version \c 13 as documented in
+ * RFC 6455. Other versions are not supported. See acceptWebSocketConnection()
+ * for further information.
  * 
  */
 class NURIA_NETWORK_EXPORT HttpClient : public QIODevice {
@@ -165,6 +171,9 @@ public:
 		HeaderContentType,
 		HeaderConnection,
 		HeaderDate,
+		HeaderUpgrade,
+		HeaderSecWebSocketExtensions,
+		HeaderSecWebSocketProtocol,
 		
 		/* Request only */
 		HeaderHost = 1000, ///< Host, must be present in a HTTP/1.1 session
@@ -179,6 +188,9 @@ public:
 		HeaderReferer,
 		HeaderDoNotTrack,
 		HeaderExpect,
+		HeaderOrigin,
+		HeaderSecWebSocketKey,
+		HeaderSecWebSocketVersion,
 		
 		/* Response only */
 		HeaderContentEncoding = 2000,
@@ -189,7 +201,8 @@ public:
 		HeaderRefresh,
 		HeaderSetCookie,
 		HeaderTransferEncoding,
-		HeaderLocation
+		HeaderLocation,
+		HeaderSecWebSocketAccept,
 		
 	};
 	
@@ -466,40 +479,25 @@ public:
 	 */
 	qint64 postBodyLength () const;
 	
-	/**
-	 * Returns how many bytes have been transferred of the POST body.
-	 */
+	/** Returns how many bytes have been transferred of the POST body. */
 	qint64 postBodyTransferred ();
 	
-	/**
-	 * See QAbstractSocket::localAddress.
-	 */
+	/** See QAbstractSocket::localAddress. */
 	QHostAddress localAddress () const;
 	
-	/**
-	 * See QAbstractSocket::localPort.
-	 */
+	/** See QAbstractSocket::localPort. */
 	quint16 localPort () const;
 	
-	/**
-	 * See QAbstractSocket::peerAddress.
-	 */
+	/** See QAbstractSocket::peerAddress. */
 	QHostAddress peerAddress () const;
 		
-	/**
-	 * See QAbstractSocket::peerPort.
-	 */
+	/** See QAbstractSocket::peerPort. */
 	quint16 peerPort () const;
 	
-	/** 
-	 * Returns the HTTP response code.
-	 * Default is <tt>200 OK</tt>
-	 */
+	/** Returns the HTTP response code. Default is \c 200. */
 	int responseCode () const;
 	
-	/**
-	 * Sets the HTTP response code.
-	 */
+	/** Sets the HTTP response code. */
 	void setResponseCode (int code);
 	
 	/**
@@ -508,9 +506,7 @@ public:
 	 */
 	bool isConnectionSecure () const;
 	
-	/**
-	 * Returns the HTTP server this client belongs to.
-	 */
+	/** Returns the HTTP server this client belongs to. */
 	HttpServer *httpServer () const;
 	
 	/** List of cookies. */
@@ -719,6 +715,28 @@ public:
 	 * the HttpClient will start to process the data right away.
 	 */
 	bool manualInit (HttpVerb verb, HttpVersion version, const QByteArray &path, const HeaderMap &headers);
+	
+	/**
+	 * Returns \c true if this request is a opening handshake for a
+	 * WebSocket connection.
+	 */
+	bool isWebSocketHandshake () const;
+	
+	/**
+	 * Sends a WebSocket handshake back to the client, opening the WebSocket
+	 * connection. Returns the WebSocket instance on success, or \c nullptr
+	 * on failure. Note that this function can still fail even if
+	 * isWebSocketHandshake() returned \c true.
+	 * 
+	 * This function should only be called once for an instance. Calling it
+	 * more than once leads to undefined behaviour.
+	 * 
+	 * You should be aware of the WebSocket HTTP request headers, in
+	 * particular, HeaderOrigin and HeaderSecWebSocketProtocol.
+	 * 
+	 * \sa isWebSocketHandshake requestHeader
+	 */
+	WebSocket *acceptWebSocketConnection ();
 	
 	// 
 	qint64 bytesAvailable () const override;
