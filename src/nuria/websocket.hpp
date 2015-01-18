@@ -61,6 +61,9 @@ class HttpClient;
  * See http://autobahn.ws/. The NuriaProject is not affiliated with Autobahn
  * in any way.
  * 
+ * Please note that UTF-8 validity checks are currently only run in the Frame
+ * mode when the frame has been completely received.
+ * 
  */
 class NURIA_NETWORK_EXPORT WebSocket : public QIODevice {
 	Q_OBJECT
@@ -110,6 +113,9 @@ public:
 		 * is emitted for all incoming frames, even if they were not
 		 * completely received yet as indicated by the WebSocket
 		 * protocol.
+		 * 
+		 * \note In this mode, automatic UTF-8 validity checks for text
+		 * frames are disabled.
 		 * 
 		 * Setting this mode enables the read buffer.
 		 */
@@ -303,7 +309,9 @@ signals:
 	
 	/**
 	 * Same as frameReceived(), but is emitted even for partial frames.
-	 * If \a last is \c true, this was the last partial frame.
+	 * If \a last is \c true, this was the last partial frame. Note that
+	 * partial TextFrame frames may have incomplete UTF-8 characters at the
+	 * \b end of \a data.
 	 */
 	void partialFrameReceived (Nuria::WebSocket::FrameType type, const QByteArray &data, bool last);
 	

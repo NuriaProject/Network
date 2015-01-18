@@ -87,20 +87,20 @@ static Nuria::Internal::WebSocketBaseFrame readBaseFrame (uint16_t data) {
 	return f;
 }
 
-bool Nuria::Internal::WebSocketReader::readFrameData (const QByteArray &data, WebSocketFrame &frame) {
+bool Nuria::Internal::WebSocketReader::readFrameData (const QByteArray &data, WebSocketFrame &frame, int pos) {
 	qint64 avail = data.length ();
 	
 	// 
-	if (avail < sizeof(frame.base)) {
+	if (avail - pos < sizeof(frame.base)) {
 		return false;
 	}
 	
 	// Read frame data
-	frame.base = readBaseFrame (*reinterpret_cast< const uint16_t * > (data.constData ()));
+	frame.base = readBaseFrame (*reinterpret_cast< const uint16_t * > (data.constData () + pos));
 	frame.extPayloadLen = 0;
 	frame.maskKey = 0;
 	
-	int offset = sizeof(frame.base);
+	int offset = pos + sizeof(frame.base);
 	
 	// Read extended payload length if needed
 	if (frame.base.payloadLen == PayloadLengthMagicNumbers::Length16Bit) {

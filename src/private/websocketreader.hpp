@@ -35,7 +35,7 @@ public:
         static QByteArray generateHandshakeKey (QByteArray requestKey);
 	
 	static int sizeOfFrame (WebSocketFrame frame);
-	static bool readFrameData (const QByteArray &data, WebSocketFrame &frame);
+	static bool readFrameData (const QByteArray &data, WebSocketFrame &frame, int pos = 0);
 	static qint64 payloadLength (WebSocketFrame frame);
 	
 	static bool isLegalClientPacket (WebSocketFrame frame);

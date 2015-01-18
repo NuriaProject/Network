@@ -19,7 +19,9 @@
 #include "private/websocketreader.hpp"
 #include "private/websocketwriter.hpp"
 #include "nuria/httptransport.hpp"
+#include "nuria/stringutils.hpp"
 #include "nuria/httpclient.hpp"
+#include "nuria/debug.hpp"
 
 namespace Nuria {
 class WebSocketRecvDevice;
@@ -53,6 +55,7 @@ public:
 	void processIncoming ();
 	bool processPacket ();
 	bool processFrame (Internal::WebSocketFrame frame, QByteArray payload);
+	bool checkUtfValidity (const QByteArray &buffer, WebSocket::FrameType type, bool last);
 	bool appendDataFrame (Internal::WebSocketFrame frame, QByteArray &payload);
 	QByteArray &getFramePayload (bool append);
 	bool processClose (QByteArray &payload);
@@ -70,11 +73,17 @@ public:
 	}
 	
 	// 
+	enum {
+		BufferShrinkThresholdHuge = 1024 * 1024,
+		BufferShrinkThreshold = 8 * 1024
+	};
 	WebSocketPrivate *d_ptr;
 	QByteArray buffer;
+	int bufferReadPos = 0;
 	
 	qint64 readData (char *data, qint64 maxlen) override;
 	qint64 writeData (const char *data, qint64 len) override;
+	void shrinkBuffer (bool fast);
 };
 
 qint64 WebSocketRecvDevice::readData (char *data, qint64 maxlen)
@@ -84,6 +93,16 @@ qint64 WebSocketRecvDevice::writeData (const char *data, qint64 len) {
 	buffer.append (data, len);
 	this->d_ptr->processIncoming ();
 	return len;
+}
+
+void WebSocketRecvDevice::shrinkBuffer (bool fast) {
+	int threshold = fast ? BufferShrinkThresholdHuge : BufferShrinkThreshold;
+	
+	if (this->bufferReadPos >= threshold) {
+		this->buffer = this->buffer.mid (this->bufferReadPos);
+		this->bufferReadPos = 0;
+	}
+	
 }
 
 }
@@ -332,36 +351,45 @@ void Nuria::WebSocketPrivate::processIncoming () {
 	
 }
 
+static inline QByteArray byteMidRef (const QByteArray &ba, int pos, int len) {
+	return QByteArray::fromRawData (ba.constData () + pos, len);
+}
+
 bool Nuria::WebSocketPrivate::processPacket () {
 	using namespace Nuria::Internal;
 	
 	QByteArray &buffer = this->backend->buffer;
+	int &bufferReadPos = this->backend->bufferReadPos;
 	WebSocketFrame frame;
 	
 	// Read frame
-	while (WebSocketReader::readFrameData (buffer, frame)) {
+	while (WebSocketReader::readFrameData (buffer, frame, bufferReadPos)) {
 		if (!WebSocketReader::isLegalClientPacket (frame)) {
 			return false;
 		}
 		
 		// Read payload
-//		qint64 len = WebSocketReader::payloadLength (frame);
 		qint64 dataLength = frame.extPayloadLen;
 		qint64 frameSize = WebSocketReader::sizeOfFrame (frame);
-		if ((frameSize + dataLength) > buffer.length ()) { // Not enough data available?
+		if ((frameSize + dataLength) > buffer.length () - bufferReadPos) { // Not enough data available?
 			break;
 		}
 		
+//		nDebug() << "Processing frame" << frame.base.opcode << "len" << frame.extPayloadLen
+//		         << "in buffer:" << buffer.length () << "offset" << bufferReadPos;
+		
 		// Process frame
-		if (!processFrame (frame, buffer.mid (frameSize, dataLength))) {
+		if (!processFrame (frame, byteMidRef (buffer, bufferReadPos + frameSize, dataLength))) {
 			return false;
 		}
 		
 		// Remove data
-		buffer = buffer.mid (frameSize + dataLength);
+		bufferReadPos += frameSize + dataLength;
+		this->backend->shrinkBuffer (true); // Only shrink now if we have lots of garbage.
 	}
 	
 	// Ok
+	this->backend->shrinkBuffer (false);
 	return true;
 }
 
@@ -388,6 +416,24 @@ bool Nuria::WebSocketPrivate::processFrame (Internal::WebSocketFrame frame, QByt
 	
 }
 
+bool Nuria::WebSocketPrivate::checkUtfValidity (const QByteArray &buffer, WebSocket::FrameType type, bool last) {
+	if (type != WebSocket::TextFrame) { // Only affects text frames
+		return true;
+	}
+	
+	// 
+	int pos = 0;
+	const char *ptr = buffer.constData ();
+	int len = buffer.length ();
+	
+	// Do check
+	StringUtils::CheckState state = StringUtils::checkValidUtf8 (ptr, len, pos);
+	
+	// Accept if either the buffer is valid, or if the data has only been
+	// received partially and thus is incomplete for the checker.
+	return (state == StringUtils::Valid || (!last && state == StringUtils::Incomplete));
+}
+
 bool Nuria::WebSocketPrivate::appendDataFrame (Internal::WebSocketFrame frame, QByteArray &payload) {
 	bool append = (frame.base.opcode == Internal::ContinuationFrame);
 	WebSocket::FrameType type;
@@ -408,6 +454,11 @@ bool Nuria::WebSocketPrivate::appendDataFrame (Internal::WebSocketFrame frame, Q
 		emit this->q_ptr->partialFrameReceived (type, payload, frame.base.fin);
 	
 		if (frame.base.fin) {
+			if (!checkUtfValidity (this->buffer, type, true)) {
+				this->q_ptr->close (WebSocket::StatusBrokenData);
+				return false; // Invalid UTF-8 sequence.
+			}
+			
 			this->frames.append (this->buffer);
 			emit this->q_ptr->frameReceived (type, this->buffer);
 			this->buffer.clear ();
@@ -453,7 +504,8 @@ bool Nuria::WebSocketPrivate::processClose (QByteArray &payload) {
 	
 	// Read close payload and do a sanity check
 	if (!Internal::WebSocketReader::readClose (payload, error, message) ||
-	    !Internal::WebSocketReader::isLegalCloseCode (error)) {
+	    !Internal::WebSocketReader::isLegalCloseCode (error) ||
+	    !checkUtfValidity (message, WebSocket::TextFrame, true)) {
 		return false;
 	}
 	
