@@ -148,3 +148,6 @@ else()
   add_unittest(NAME tst_websocketreader QT Network DEFINES NuriaNetwork_EXPORTS EMBED_TARGETS NuriaNetwork)
   add_unittest(NAME tst_websocketwriter QT Network DEFINES NuriaNetwork_EXPORTS EMBED_TARGETS NuriaNetwork)
 endif()
+
+# Autobahn Testsuite server tool
+add_subdirectory(tests/autobahn)
