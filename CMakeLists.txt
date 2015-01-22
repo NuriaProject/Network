@@ -124,8 +124,6 @@ export(TARGETS NuriaNetwork FILE "${NURIA_CMAKE_PREFIX}/NuriaNetworkConfig.cmake
 enable_testing()
 add_unittest(NAME tst_httpclient QT Network NURIA NuriaNetwork
              SOURCES httpmemorytransport.cpp httpmemorytransport.hpp)
-add_unittest(NAME tst_websocket QT Network NURIA NuriaNetwork
-             SOURCES httpmemorytransport.cpp httpmemorytransport.hpp)
 add_unittest(NAME tst_httpmultipartreader QT Network NURIA NuriaNetwork)
 add_unittest(NAME tst_httpurlencodedreader QT Network NURIA NuriaNetwork)
 add_unittest(NAME tst_httpparser QT Network NURIA NuriaNetwork)
@@ -141,12 +139,16 @@ if(NOT WIN32)
   add_unittest(NAME tst_httptcptransport QT Network NURIA NuriaNetwork)
   add_unittest(NAME tst_websocketreader QT Network NURIA NuriaNetwork)
   add_unittest(NAME tst_websocketwriter QT Network NURIA NuriaNetwork)
+  add_unittest(NAME tst_websocket QT Network NURIA NuriaNetwork
+               SOURCES httpmemorytransport.cpp httpmemorytransport.hpp)
 else()
   add_unittest(NAME tst_fastcgireader QT Network DEFINES NuriaNetwork_EXPORTS EMBED_TARGETS NuriaNetwork)
   add_unittest(NAME tst_fastcgiwriter QT Network DEFINES NuriaNetwork_EXPORTS EMBED_TARGETS NuriaNetwork)
   add_unittest(NAME tst_httptcptransport QT Network DEFINES NuriaNetwork_EXPORTS EMBED_TARGETS NuriaNetwork)
   add_unittest(NAME tst_websocketreader QT Network DEFINES NuriaNetwork_EXPORTS EMBED_TARGETS NuriaNetwork)
   add_unittest(NAME tst_websocketwriter QT Network DEFINES NuriaNetwork_EXPORTS EMBED_TARGETS NuriaNetwork)
+  add_unittest(NAME tst_websocket QT Network DEFINES NuriaNetwork_EXPORTS EMBED_TARGETS NuriaNetwork
+               SOURCES httpmemorytransport.cpp httpmemorytransport.hpp)
 endif()
 
 # Autobahn Testsuite server tool

@@ -177,7 +177,7 @@ QByteArray Nuria::RestfulHttpNode::generateResultData (const QVariant &result, N
 }
 
 static InvokeInfo &findInvokeInfo (Nuria::Internal::RestfulHttpNodeSlotData &data, Nuria::HttpClient *client) {
-	int verbIdx = ffs (int (client->verb ())) - 1;
+	int verbIdx = Nuria::ffs (int (client->verb ())) - 1;
 	return data.handlers[verbIdx % NumberOfHandlers];
 }
 
