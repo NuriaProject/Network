@@ -337,8 +337,6 @@ public:
 	 */
 	HttpNode *findNode (const QString &name) const;
 	
-protected:
-	
 	/**
 	 * Recurses into the HttpNode structure to invoke the requested slot.
 	 * The default implementation checks for the following:
@@ -375,6 +373,8 @@ protected:
 	 */
 	virtual bool invokePath (const QString &path, const QStringList &parts,
 				 int index, HttpClient *client);
+	
+protected:
 	
 	/**
 	 * This method is used by invokePath() to check if \a client is allowed
