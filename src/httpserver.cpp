@@ -23,7 +23,7 @@
 #include "nuria/httpbackend.hpp"
 #include "nuria/httpclient.hpp"
 #include "nuria/httpnode.hpp"
-#include <nuria/debug.hpp>
+#include <nuria/logger.hpp>
 
 #include "private/httptcpbackend.hpp"
 #include "private/httpprivate.hpp"

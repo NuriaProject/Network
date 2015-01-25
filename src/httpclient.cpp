@@ -33,7 +33,7 @@
 #include "nuria/httpwriter.hpp"
 #include "nuria/websocket.hpp"
 #include "nuria/httpnode.hpp"
-#include <nuria/debug.hpp>
+#include <nuria/logger.hpp>
 
 #include "private/standardfilters.hpp"
 #include "private/websocketreader.hpp"

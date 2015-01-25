@@ -17,7 +17,7 @@
 #include "httpthread.hpp"
 
 #include "../nuria/httpserver.hpp"
-#include <nuria/debug.hpp>
+#include <nuria/logger.hpp>
 
 Nuria::Internal::HttpThread::HttpThread (HttpServer *server)
         : QThread (server), m_server (server)

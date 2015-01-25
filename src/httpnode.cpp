@@ -20,7 +20,7 @@
 
 #include "private/httpprivate.hpp"
 #include "nuria/httpserver.hpp"
-#include <nuria/debug.hpp>
+#include <nuria/logger.hpp>
 
 // Note: HttpNodePrivate and SlotInfoPrivate are defined in private/httpprivate.hpp!
 

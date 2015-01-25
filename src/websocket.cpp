@@ -21,7 +21,7 @@
 #include "nuria/httptransport.hpp"
 #include "nuria/stringutils.hpp"
 #include "nuria/httpclient.hpp"
-#include "nuria/debug.hpp"
+#include "nuria/logger.hpp"
 
 namespace Nuria {
 class WebSocketRecvDevice;

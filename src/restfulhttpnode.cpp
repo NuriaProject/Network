@@ -20,7 +20,7 @@
 #include <nuria/bitutils.hpp>
 #include <nuria/callback.hpp>
 #include <QRegularExpression>
-#include <nuria/debug.hpp>
+#include <nuria/logger.hpp>
 #include <QJsonDocument>
 #include <QDateTime>
 

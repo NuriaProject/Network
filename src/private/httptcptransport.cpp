@@ -19,7 +19,7 @@
 #include "../nuria/httpclient.hpp"
 #include "../nuria/httpserver.hpp"
 #include "httptcpbackend.hpp"
-#include <nuria/debug.hpp>
+#include <nuria/logger.hpp>
 #include "tcpserver.hpp"
 
 #include <QSslSocket>

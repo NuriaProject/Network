@@ -18,7 +18,7 @@
 
 #include "nuria/httpclient.hpp"
 #include "nuria/httpparser.hpp"
-#include <nuria/debug.hpp>
+#include <nuria/logger.hpp>
 #include <QBuffer>
 #include <QMap>
 

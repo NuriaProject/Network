@@ -16,7 +16,7 @@
 
 #include "tcpserver.hpp"
 
-#include <nuria/debug.hpp>
+#include <nuria/logger.hpp>
 #include <QTcpSocket>
 
 #ifndef NURIA_NO_SSL_HTTP
