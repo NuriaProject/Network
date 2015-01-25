@@ -56,8 +56,25 @@ class HttpNode;
  * 
  * Please see HttpNode for further information.
  * 
- * \par Multithreading
+ * \par Error handling
+ * Custom HTTP error pages can be served by setting an error node through
+ * setErrorNode(). When a error occurs, like a \c 404 ("Not Found"), the node
+ * will be invoked with the invoked path set to the error code. It is then free
+ * to send the data to the client. Note that this must be done immediately,
+ * as the client will be destroyed afterwards.
  * 
+ * For example, if a \c 404 occurs, the error node will be invoked with a path
+ * of "404".
+ * 
+ * If the error node could not serve the error code, or there is no error node
+ * set, a generic short error message will be served.
+ * 
+ * You can use HttpClient::killConnection() to send a error message from user
+ * code. Note that for this no data must have been sent yet to the client.
+ * 
+ * \note You can combine this with the static file serving option of HttpNode.
+ * 
+ * \par Multithreading
  * A HttpServer can either do all request execution in the thread it lifes in,
  * which is the default setting, or use threading to offload requests. If
  * threading is active (By using setMaxThreads), all request handling will be
@@ -66,10 +83,11 @@ class HttpNode;
  * \warning When using multi-threading, be aware that your code is also
  * thread-safe.
  * 
+ * \warning HttpServers setters are not thread-safe.
+ * 
  * Tip: You can use DependencyManager to manage resources
  * 
  * \par Connection time-outs
- * 
  * The HTTP implementation offers a built-in time-out detection for connections.
  * Exact timings can be controlled using the setTimeout() method.
  * 
@@ -112,6 +130,15 @@ public:
 	 * be deleted. HttpServer will take ownership of \a node.
 	 */
 	void setRoot (HttpNode *node);
+	
+	/** Returns the error node. By default, the result is \c nullptr. */
+	HttpNode *errorNode () const;
+	
+	/**
+	 * Replaces the current error node (if any) with \a node. The old root
+	 * node will be deleted. Ownership of \a node is transferred.
+	 */
+	void setErrorNode (HttpNode *node);
 	
 	/**
 	 * Adds a TCP server, listening on \a interface and \a port.
@@ -202,11 +229,9 @@ private:
 	friend class HttpClient;
 	friend class HttpNode;
 	
-	/**
-	 * Internal function used by HttpClient::resolveUrl to invoke a node slot
-	 * by the \a path. Returns \a true on success.
-	 */
 	bool invokeByPath (HttpClient *client, const QString &path);
+	void invokeError(HttpClient *client, int statusCode, const QByteArray &cause);
+	
 	bool addTcpServerBackend (Internal::TcpServer *server, const QHostAddress &interface, quint16 port);
 	bool addTransport (HttpTransport *transport);
 	void startProcessingThreads (int amount);

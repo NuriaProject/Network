@@ -34,6 +34,7 @@ namespace Nuria {
 class HttpServerPrivate {
 public:
 	
+	HttpNode *error = nullptr;
 	HttpNode *root;
 	QString fqdn;
 	
@@ -103,6 +104,25 @@ void Nuria::HttpServer::setRoot (HttpNode *node) {
 	
 	node->setParent (this);
 	node->d_ptr->parent = nullptr;
+	
+}
+
+Nuria::HttpNode *Nuria::HttpServer::errorNode () const {
+	return this->d_ptr->error;
+}
+
+void Nuria::HttpServer::setErrorNode (HttpNode *node) {
+	if (node == this->d_ptr->error) {
+		return;
+	}
+	
+	delete this->d_ptr->error;
+	this->d_ptr->error = node;
+	
+	if (node) {
+		node->setParent (this);
+		node->d_ptr->parent = nullptr;
+	}
 	
 }
 
@@ -220,6 +240,22 @@ bool Nuria::HttpServer::invokeByPath (HttpClient *client, const QString &path) {
 	}
 	
 	return false;
+}
+
+void Nuria::HttpServer::invokeError (HttpClient *client, int statusCode, const QByteArray &cause) {
+	
+	// Serve error through the error node.
+	bool success = false;
+	if (this->d_ptr->error) {
+		QString path = QString::number (statusCode);
+		success = this->d_ptr->error->invokePath (path, { path }, 0, client);
+	}
+	
+	// If the error node didn't serve an error for this, send a generic message
+	if (!success && client->isOpen () && !client->responseHeaderSent ()) {
+		client->write (cause);
+	}
+	
 }
 
 bool Nuria::HttpServer::addTcpServerBackend (Internal::TcpServer *server, const QHostAddress &interface, quint16 port) {

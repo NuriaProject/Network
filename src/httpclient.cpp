@@ -568,7 +568,7 @@ bool Nuria::HttpClient::sendPipeChunkToClient () {
 	enum { MaxChunkSize = 16 * 1024 };
 	
 	// 
-	if (!this->d_ptr->pipeDevice->isReadable ()) {
+	if (!this->d_ptr->pipeDevice || !this->d_ptr->pipeDevice->isReadable ()) {
 		return false;
 	}
 	
@@ -813,8 +813,10 @@ void Nuria::HttpClient::pipeToClientReadyRead () {
 			return;
 		
 		// Disconnect aboutToClose() as it may lead to infinite recursion
-		disconnect (this->d_ptr->pipeDevice, 0, this, 0);
-		this->d_ptr->pipeDevice->close ();
+		if (this->d_ptr->pipeDevice) {
+			disconnect (this->d_ptr->pipeDevice, 0, this, 0);
+			this->d_ptr->pipeDevice->close ();
+		}
 		
 		// Send response header. This is important to do if the user
 		// piped an empty buffer.
@@ -1491,24 +1493,31 @@ bool Nuria::HttpClient::sendResponseHeader () {
 
 bool Nuria::HttpClient::killConnection (int error, const QString &cause) {
 	
-	if (!this->d_ptr->transport->isOpen ()) {
+	if (!this->d_ptr->transport->isOpen () || this->d_ptr->headerSent) {
 		return false;
 	}
 	
-	// Send (really) minimal error response
+	// Make sure we're allowed to write data
+	this->d_ptr->pipeDevice = nullptr;
+	setOpenMode (QIODevice::WriteOnly);
+	
+	// Discard out buffer if used
+	if (this->d_ptr->outBuffer) {
+		this->d_ptr->outBuffer->reset ();
+		this->d_ptr->outBuffer->discard ();
+	}
+	
+	// Serve error response
 	if (!this->d_ptr->headerSent) {
 		this->d_ptr->responseCode = error;
 		this->d_ptr->responseName = cause;
 		
-		// 
 		QByteArray causeData = cause.toLatin1 ();
 		if (causeData.isEmpty ()) {
 			causeData = httpStatusCodeName (error);
 		}
 		
-		// 
-		sendResponseHeader ();
-		writeDataInternal (causeData);
+		this->d_ptr->server->invokeError (this, error, causeData);
 	}
 	
 	// Close connection

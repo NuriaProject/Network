@@ -202,6 +202,9 @@ bool TestNode::invokePath (const QString &path, const QStringList &parts,
 	} else if (path == "/redirect/remote") {
 		client->redirectClient (QUrl ("http://nuriaproject.org/"));
 		
+	} else if (path == "/error") {
+		client->killConnection (400, "Something");
+		
 	} else {
 		qDebug("%s", qPrintable(path));
 		client->write (path.toLatin1 ());
@@ -249,6 +252,10 @@ private slots:
 	void redirectClientLocal ();
 	void redirectClientLocalCustomResponseCode ();
 	void redirectClientRemote ();
+	
+	void errorNodeIsInvokedForKillConnection ();
+	void genericErrorMessageSentIfNoErrorNodePresent ();
+	void genericErrorMessageSentIfErrorNodeDidntServe ();
 	
 private:
 	
@@ -365,7 +372,10 @@ void HttpClientTest::postWithTooMuchData () {
 			   "\r\n"
 			   "0123456789";
 	QByteArray expected = "HTTP/1.1 413 Request Entity Too Large\r\n"
-			      "Connection: close\r\nDate: %%\r\n\r\nRequest Entity Too Large";
+			      "Connection: close\r\n"
+	                      "Content-Length: 24\r\n"
+	                      "Date: %%\r\n\r\n"
+	                      "Request Entity Too Large";
 	insertDateTime (expected);
 	
 	QTest::ignoreMessage (QtDebugMsg, "close()");
@@ -890,6 +900,78 @@ void HttpClientTest::redirectClientRemote () {
 	HttpMemoryTransport *transport = getTransport (client);
 	
 	QCOMPARE(transport->outData, expected);
+}
+
+void HttpClientTest::errorNodeIsInvokedForKillConnection () {
+	QByteArray input = "GET /error HTTP/1.0\r\n\r\n";
+	QByteArray expected = "HTTP/1.0 400 Something\r\n"
+	                      "Connection: close\r\n"
+	                      "Content-Length: 10\r\n\r\n"
+	                      "Error node";
+	int clientCode = 0;
+	
+	// Error node
+	auto slot = [&](HttpClient *client) {
+		clientCode = client->responseCode ();
+		client->write ("Error node");
+	};
+	
+	HttpNode *errorNode = new HttpNode;
+	errorNode->connectSlot ("400", Callback::fromLambda (slot));
+	this->server->setErrorNode (errorNode);
+	
+	// 
+	QTest::ignoreMessage (QtDebugMsg, "close()");
+	HttpClient *client = createClient (input);
+	HttpMemoryTransport *transport = getTransport (client);
+	
+	// 
+	this->server->setErrorNode (nullptr);
+	QCOMPARE(transport->outData, expected);
+	QCOMPARE(clientCode, 400);
+}
+
+void HttpClientTest::genericErrorMessageSentIfNoErrorNodePresent () {
+	QByteArray input = "GET /error HTTP/1.0\r\n\r\n";
+	QByteArray expected = "HTTP/1.0 400 Something\r\n"
+	                      "Connection: close\r\n"
+	                      "Content-Length: 9\r\n\r\n"
+	                      "Something";
+	
+	QTest::ignoreMessage (QtDebugMsg, "close()");
+	HttpClient *client = createClient (input);
+	HttpMemoryTransport *transport = getTransport (client);
+	
+	QCOMPARE(transport->outData, expected);
+}
+
+void HttpClientTest::genericErrorMessageSentIfErrorNodeDidntServe () {
+	QByteArray input = "GET /error HTTP/1.0\r\n\r\n";
+	QByteArray expected = "HTTP/1.0 400 Something\r\n"
+	                      "Connection: close\r\n"
+	                      "Content-Length: 9\r\n\r\n"
+	                      "Something";
+	int clientCode = 0;
+	
+	// Error node
+	auto slot = [&](HttpClient *client) {
+		clientCode = client->responseCode ();
+		client->write ("Error node");
+	};
+	
+	HttpNode *errorNode = new HttpNode;
+	errorNode->connectSlot ("401", Callback::fromLambda (slot));
+	this->server->setErrorNode (errorNode);
+	
+	// 
+	QTest::ignoreMessage (QtDebugMsg, "close()");
+	HttpClient *client = createClient (input);
+	HttpMemoryTransport *transport = getTransport (client);
+	
+	// 
+	this->server->setErrorNode (nullptr);
+	QCOMPARE(transport->outData, expected);
+	QCOMPARE(clientCode, 0);
 }
 
 QTEST_MAIN(HttpClientTest)
