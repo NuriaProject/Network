@@ -356,7 +356,7 @@ public:
 	QList< QByteArray > requestHeaders (HttpHeader header) const;
 	
 	/** Returns a map of received request headers. */
-	const HeaderMap &requestHeaders () const;
+	HeaderMap requestHeaders () const;
 	
 	/** Returns \a true when \a key has a value in the response header */
 	bool hasResponseHeader (const QByteArray &key) const;
@@ -367,7 +367,7 @@ public:
 	/**
 	 * Returns the current response headers.
 	 */
-	const HeaderMap &responseHeaders () const;
+	HeaderMap responseHeaders () const;
 	
 	/**
 	 * Returns the response headers with key \a key.

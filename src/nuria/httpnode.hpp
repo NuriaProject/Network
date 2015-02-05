@@ -285,12 +285,12 @@ public:
 	/**
 	 * Returns the resource name of this node.
 	 */
-	const QString &resourceName () const;
+	QString resourceName () const;
 	
 	/** 
 	 * Returns the static resource file directory of this node.
 	 */
-	const QDir &staticResourceDir () const;
+	QDir staticResourceDir () const;
 	
 	/**
 	 * Returns the current static resource mode.

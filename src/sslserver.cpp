@@ -40,11 +40,11 @@ Nuria::SslServer::~SslServer () {
 	delete this->d_ptr;
 }
 
-const QSslKey &Nuria::SslServer::privateKey () const {
+QSslKey Nuria::SslServer::privateKey() const {
 	return this->d_ptr->key;
 }
 
-const QSslCertificate &Nuria::SslServer::localCertificate () const {
+QSslCertificate Nuria::SslServer::localCertificate() const {
 	return this->d_ptr->cert;
 }
 

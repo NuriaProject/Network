@@ -202,11 +202,11 @@ bool Nuria::HttpNode::addNode (HttpNode *node) {
 	return true;
 }
 
-const QString &Nuria::HttpNode::resourceName () const {
+QString Nuria::HttpNode::resourceName() const {
 	return this->d_ptr->resourceName;
 }
 
-const QDir &Nuria::HttpNode::staticResourceDir () const {
+QDir Nuria::HttpNode::staticResourceDir() const {
 	return this->d_ptr->resourceDir;
 }
 

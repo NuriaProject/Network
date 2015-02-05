@@ -37,8 +37,8 @@ public:
 	explicit SslServer (QObject *parent = 0);
 	~SslServer ();
 	
-	const QSslKey &privateKey () const;
-	const QSslCertificate &localCertificate () const;
+	QSslKey privateKey () const;
+	QSslCertificate localCertificate () const;
 	
 	void setPrivateKey (const QSslKey &key);
 	void setLocalCertificate (const QSslCertificate &cert);

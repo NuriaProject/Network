@@ -866,7 +866,7 @@ QList< QByteArray > Nuria::HttpClient::requestHeaders (Nuria::HttpClient::HttpHe
 	return this->d_ptr->requestHeaders.values (httpHeaderName (header));
 }
 
-const Nuria::HttpClient::HeaderMap &Nuria::HttpClient::requestHeaders () const {
+Nuria::HttpClient::HeaderMap Nuria::HttpClient::requestHeaders() const {
 	return this->d_ptr->requestHeaders;
 }
 
@@ -878,7 +878,7 @@ bool Nuria::HttpClient::hasResponseHeader (HttpClient::HttpHeader header) const 
 	return this->d_ptr->responseHeaders.contains (httpHeaderName (header));
 }
 
-const Nuria::HttpClient::HeaderMap &Nuria::HttpClient::responseHeaders () const {
+Nuria::HttpClient::HeaderMap Nuria::HttpClient::responseHeaders() const {
 	return this->d_ptr->responseHeaders;
 }
 
