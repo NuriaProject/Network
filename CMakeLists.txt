@@ -53,6 +53,8 @@ SET(NuriaNetwork_SRC
     src/nuria/fastcgibackend.hpp
     src/websocket.cpp
     src/nuria/websocket.hpp
+    src/private/streamingjsonhelper.cpp
+    src/private/streamingjsonhelper.hpp
     src/private/httptcptransport.cpp
     src/private/httptcptransport.hpp
     src/private/httpprivate.hpp
@@ -141,6 +143,8 @@ if(NOT WIN32)
   add_unittest(NAME tst_websocketwriter QT Network NURIA NuriaNetwork)
   add_unittest(NAME tst_websocket QT Network NURIA NuriaNetwork
                SOURCES httpmemorytransport.cpp httpmemorytransport.hpp)
+  add_unittest(NAME tst_streamingjsonhelper QT Network NURIA NuriaNetwork)
+  
 else()
   add_unittest(NAME tst_fastcgireader QT Network DEFINES NuriaNetwork_EXPORTS EMBED_TARGETS NuriaNetwork)
   add_unittest(NAME tst_fastcgiwriter QT Network DEFINES NuriaNetwork_EXPORTS EMBED_TARGETS NuriaNetwork)
@@ -149,6 +153,7 @@ else()
   add_unittest(NAME tst_websocketwriter QT Network DEFINES NuriaNetwork_EXPORTS EMBED_TARGETS NuriaNetwork)
   add_unittest(NAME tst_websocket QT Network DEFINES NuriaNetwork_EXPORTS EMBED_TARGETS NuriaNetwork
                SOURCES httpmemorytransport.cpp httpmemorytransport.hpp)
+  add_unittest(NAME tst_streamingjsonhelper QT Network DEFINES NuriaNetwork_EXPORTS EMBED_TARGETS NuriaNetwork)
 endif()
 
 # Autobahn Testsuite server tool
