@@ -47,7 +47,7 @@ public:
 	int timeoutConnect = HttpTransport::DefaultConnectTimeout;
 	int timeoutData = HttpTransport::DefaultDataTimeout;
 	int timeoutKeepAlive = HttpTransport::DefaultKeepAliveTimeout;
-	int minBytesReceived = HttpTransport::DefaultMinimalBytesReceived;
+	int minBytesReceived = HttpTransport::DefaultMinimumBytesReceived;
 	
 };
 }
@@ -275,8 +275,8 @@ bool Nuria::HttpServer::addTcpServerBackend (Internal::TcpServer *server, const 
 bool Nuria::HttpServer::addTransport (HttpTransport *transport) {
 	
 	if (this->d_ptr->activeThreads < 1 || this->thread () != transport->thread ()) {
-		connect (transport, SIGNAL(connectionTimedout(Nuria::HttpTransport::Timeout)),
-		         this, SLOT(forwardTimeout(Nuria::HttpTransport::Timeout)));
+		connect (transport, SIGNAL(connectionTimedout(Nuria::AbstractTransport::Timeout)),
+		         this, SLOT(forwardTimeout(Nuria::AbstractTransport::Timeout)));
 		return false;
 	}
 	
@@ -353,7 +353,7 @@ void Nuria::HttpServer::threadStopped (QObject *obj) {
 	
 }
 
-void Nuria::HttpServer::forwardTimeout (Nuria::HttpTransport::Timeout mode) {
+void Nuria::HttpServer::forwardTimeout (Nuria::AbstractTransport::Timeout mode) {
 	HttpTransport *transport = qobject_cast< HttpTransport * > (sender ());
 	if (transport) {
 		emit connectionTimedout (transport, mode);

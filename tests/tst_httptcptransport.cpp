@@ -156,7 +156,8 @@ void HttpTcpTransportTest::testConnectTimeout () {
 	QVERIFY(socket.waitForConnected (Timeout));
 	
 	// Wait ...
-	QSignalSpy spy (this->server, SIGNAL(connectionTimedout(Nuria::HttpTransport*,Nuria::HttpTransport::Timeout)));
+	QSignalSpy spy (this->server,
+	                SIGNAL(connectionTimedout(Nuria::HttpTransport*,Nuria::AbstractTransport::Timeout)));
 	QThread::msleep (Timeout + 100);
 	
 	// 
@@ -174,7 +175,8 @@ void HttpTcpTransportTest::testDataTimeout () {
 	QVERIFY(socket.waitForBytesWritten (Timeout));
 	
 	// Wait ...
-	QSignalSpy spy (this->server, SIGNAL(connectionTimedout(Nuria::HttpTransport*,Nuria::HttpTransport::Timeout)));
+	QSignalSpy spy (this->server,
+	                SIGNAL(connectionTimedout(Nuria::HttpTransport*,Nuria::AbstractTransport::Timeout)));
 	QThread::msleep (Timeout * 2);
 	
 	// 
@@ -199,7 +201,8 @@ void HttpTcpTransportTest::testKeepAliveTimeout () {
 	}
 	
 	// Wait ...
-	QSignalSpy spy (this->server, SIGNAL(connectionTimedout(Nuria::HttpTransport*,Nuria::HttpTransport::Timeout)));
+	QSignalSpy spy (this->server,
+	                SIGNAL(connectionTimedout(Nuria::HttpTransport*,Nuria::AbstractTransport::Timeout)));
 	QThread::msleep (Timeout + 100);
 	
 	// 

@@ -36,6 +36,8 @@ SET(NuriaNetwork_SRC
     src/nuria/httpfilter.hpp
     src/httpserver.cpp
     src/nuria/httpserver.hpp
+    src/abstracttransport.cpp
+    src/nuria/abstracttransport.hpp
     src/httptransport.cpp
     src/nuria/httptransport.hpp
     src/httpwriter.cpp
@@ -58,6 +60,7 @@ SET(NuriaNetwork_SRC
     src/private/httptcptransport.cpp
     src/private/httptcptransport.hpp
     src/private/httpprivate.hpp
+    src/private/transportprivate.hpp
     src/private/standardfilters.cpp
     src/private/standardfilters.hpp
     src/private/httpthread.cpp
@@ -130,6 +133,7 @@ add_unittest(NAME tst_httpmultipartreader QT Network NURIA NuriaNetwork)
 add_unittest(NAME tst_httpurlencodedreader QT Network NURIA NuriaNetwork)
 add_unittest(NAME tst_httpparser QT Network NURIA NuriaNetwork)
 add_unittest(NAME tst_httpwriter QT Network NURIA NuriaNetwork)
+add_unittest(NAME tst_abstracttransport QT Network NURIA NuriaNetwork)
 add_unittest(NAME tst_restfulhttpnode QT Network NURIA NuriaNetwork
              SOURCES httpmemorytransport.cpp httpmemorytransport.hpp testnode.hpp)
 add_unittest(NAME tst_rewritehttpnode QT Network NURIA NuriaNetwork

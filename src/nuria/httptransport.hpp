@@ -17,9 +17,7 @@
 #ifndef NURIA_HTTPTRANSPORT_HPP
 #define NURIA_HTTPTRANSPORT_HPP
 
-#include "network_global.hpp"
-#include <QHostAddress>
-#include <QIODevice>
+#include "abstracttransport.hpp"
 
 namespace Nuria {
 
@@ -50,9 +48,9 @@ class HttpServer;
  * be run in another thread than its HttpBackend.
  * 
  */
-class NURIA_NETWORK_EXPORT HttpTransport : public QObject {
+class NURIA_NETWORK_EXPORT HttpTransport : public AbstractTransport {
 	Q_OBJECT
-	Q_ENUMS(Type Timeout)
+	Q_ENUMS(Type)
 public:
 	
 	// Default configuration
@@ -60,18 +58,6 @@ public:
 		
 		/** Maximum requests per transport in a keep-alive session. */
 		MaxRequestsDefault = 10,
-		
-		/** Default value for ConnectTimeout. In msec. */
-		DefaultConnectTimeout = 2000,
-		
-		/** Default value for DataTimeout. In msec. */
-		DefaultDataTimeout = 5000,
-		
-		/** Default value for KeepAliveTimeout. In msec. */
-		DefaultKeepAliveTimeout = 30000,
-		
-		/** Default value for minimalBytesReceived() in bytes. */
-		DefaultMinimalBytesReceived = 512,
 		
 	};
 	
@@ -95,29 +81,6 @@ public:
 	};
 	
 	/**
-	 * Enumeration of different timeout timers. If one of these trigger,
-	 * the connection is closed by the implementation.
-	 */
-	enum Timeout {
-		
-		/** The client has connected, but hasn't sent anything yet. */
-		ConnectTimeout = 0,
-		
-		/**
-		 * Timeout for when the client has sent something, but not a
-		 * complete request, and just does nothing afterwards.
-		 */
-		DataTimeout = 1,
-		
-		/**
-		 * Timeout for keep-alive connections, meaning, the client has
-		 * made a request and we're now keeping the connection open
-		 * waiting for further requests.
-		 */
-		KeepAliveTimeout = 2
-	};
-	
-	/**
 	 * Constructor. \a server will be automatically the owner.
 	 */
 	explicit HttpTransport (HttpBackend *backend, HttpServer *server);
@@ -132,43 +95,6 @@ public:
 	virtual Type type () const;
 	
 	/**
-	 * Returns \c true if the connection is somehow protected against
-	 * external eavesdropping, e.g. through encryption. The default
-	 * implementation returns \c false.
-	 */
-	virtual bool isSecure () const;
-	
-	/**
-	 * Returns the local address to which the peer is connected.
-	 * The default implementation returns QHostAddress::Null.
-	 */
-	virtual QHostAddress localAddress () const;
-	
-	/**
-	 * Returns the local port to which the peer is connected.
-	 * The default implementation returns 0.
-	 */
-	virtual quint16 localPort () const;
-	
-	/**
-	 * Returns the address of the connected peer.
-	* The default implementation returns QHostAddress::Null.
-	 */
-	virtual QHostAddress peerAddress () const;
-	
-	/**
-	 * Returns the port of the connected peer.
-	 * The default implementation returns 0.
-	 */
-	virtual quint16 peerPort () const;
-	
-	/** Returns \c true if the transport is open. */
-	virtual bool isOpen () const = 0;
-	
-	/** Returns the count of requests this transport has started. */
-	int currentRequestCount () const;
-	
-	/**
 	 * Returns the maximum count of requests per transport.
 	 * A value of \c -1 indicates that there's no limit.
 	 */
@@ -176,28 +102,6 @@ public:
 	
 	/** Sets the maximum count of requests per transport. */
 	void setMaxRequests (int count);
-	
-	/**
-	 * Returns the timeout time for \a which in msec.
-	 * A value of \c -1 disables the timeout.
-	 */
-	int timeout (Timeout which);
-	
-	/** Sets the timeout \a which to \a msec. */
-	void setTimeout (Timeout which, int msec);
-	
-	/**
-	 * Returns the amount of bytes to be minimal received from the client in
-	 * the last \c timeout(DataTimeout) milliseconds. Depending on the
-	 * implementation, the maximum timeout could be twice the set timeout
-	 * time.
-	 * 
-	 * The default is \c 512.
-	 */
-	int minimalBytesReceived () const;
-	
-	/** Sets the minimal bytes received amount. */
-	void setMinimalBytesReceived (int bytes);
 	
 	/** Returns the HttpBackend associated with this transport. */
 	HttpBackend *backend ();
@@ -210,42 +114,9 @@ public slots:
 	 */
 	virtual bool flush (HttpClient *client);
 	
-	/**
-	 * Closes the underlying transport immediately, discarding any data
-	 * in the send buffer (If one exists). This is used by clients if they
-	 * encounter a fatal error which should result in disconnecting from
-	 * the peer entirely.
-	 */
-	virtual void forceClose () = 0;
-	
-	/**
-	 * Called by the HttpServer when the HttpTransport was moved by
-	 * addToServer(). If the server didn't move the transport,
-	 * addToServer() will call this function.
-	 * The default implementation does nothing.
-	 */
-	virtual void init ();
-	
-signals:
-	
-	/** Emitted when the connection to the client has been lost. */
-	void connectionLost ();
-	
-	/** The value of \a timeout has been changed to \a msec. */
-	void timeoutChanged (Timeout timeout, int msec);
-	
-	/**
-	 * Emitted when connection timed out in \a mode. After this signal was
-	 * emitted, the connection is closed and thus destroyed.
-	 */
-	void connectionTimedout (Nuria::HttpTransport::Timeout mode);
-	
 protected:
 	
 	friend class HttpClient;
-	
-	/** Used by implementations to update the request count. */
-	void setCurrentRequestCount (int count);
 	
 	/**
 	 * Used by \a client to tell the implementation that it's done.
@@ -281,12 +152,12 @@ protected:
 	bool addToServer ();
 	
 private:
-	HttpTransportPrivate *d_ptr;
+	Q_DECLARE_PRIVATE(HttpTransport)
+	
 };
 
 }
 
-Q_DECLARE_METATYPE(Nuria::HttpTransport::Timeout);
 Q_DECLARE_METATYPE(Nuria::HttpTransport*);
 
 #endif // NURIA_HTTPTRANSPORT_HPP

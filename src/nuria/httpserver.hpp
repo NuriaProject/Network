@@ -219,10 +219,10 @@ public:
 signals:
 	
 	/** Emitted when \a transport timed out because in \a mode. */
-	void connectionTimedout (Nuria::HttpTransport *transport, Nuria::HttpTransport::Timeout mode);
+	void connectionTimedout (Nuria::HttpTransport *transport, Nuria::AbstractTransport::Timeout mode);
 	
 private slots:
-	void forwardTimeout (Nuria::HttpTransport::Timeout mode);
+	void forwardTimeout (Nuria::AbstractTransport::Timeout mode);
 	
 private:
 	friend class HttpTransport;

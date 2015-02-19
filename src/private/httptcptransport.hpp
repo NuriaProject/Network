@@ -58,19 +58,16 @@ private slots:
 protected:
 	void close (HttpClient *client) override;
 	bool sendToRemote (HttpClient *client, const QByteArray &data) override;
-	void timerEvent (QTimerEvent *) override;
 	
 private:
-	bool checkDataTimeout ();
 	void clientDestroyed (QObject *object);
 	void bytesWritten (qint64 bytes);
 	void processData (QByteArray &data);
+	void appendReceivedDataToBuffer ();
 	void dataReceived ();
 	void clientDisconnected ();
 	void closeInternal ();
 	bool wasLastRequest ();
-	void startTimeout (Timeout mode);
-	void killTimeout ();
 	void connectionReady ();
 	
 	HttpTcpTransportPrivate *d_ptr;

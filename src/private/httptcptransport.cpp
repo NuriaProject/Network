@@ -36,12 +36,6 @@ public:
 	HttpClient *curClient = nullptr;
 	HttpServer *server;
 	
-	HttpTransport::Timeout timeoutMode = HttpTransport::ConnectTimeout;
-	int timeoutTimer = -1;
-	int bytesReceived = 0;
-	int bytesReceivedLast = 0;
-	bool notReceivedData = false;
-	
 	QByteArray buffer;
 	
 };
@@ -150,30 +144,6 @@ bool Nuria::Internal::HttpTcpTransport::sendToRemote (HttpClient *client, const 
 	return (this->d_ptr->socket->write (data) == data.length ());
 }
 
-void Nuria::Internal::HttpTcpTransport::timerEvent (QTimerEvent *) {
-	if (this->d_ptr->timeoutMode == DataTimeout && checkDataTimeout ()) {
-		return;
-	}
-	
-	// 
-	emit connectionTimedout (this->d_ptr->timeoutMode);
-	forceClose ();
-	
-}
-
-bool Nuria::Internal::HttpTcpTransport::checkDataTimeout () {
-	bool received = (this->d_ptr->bytesReceived > this->d_ptr->bytesReceivedLast + minimalBytesReceived ());
-	this->d_ptr->bytesReceivedLast = this->d_ptr->bytesReceived;
-	
-	// Check if client sent enough data over the course of the last 2*timeout msec.
-	if (received || (!received && !this->d_ptr->notReceivedData)) {
-		this->d_ptr->notReceivedData = !received;
-		return true;
-	}
-	
-	return false;
-}
-
 void Nuria::Internal::HttpTcpTransport::clientDestroyed (QObject *object) {
 	if (object != this->d_ptr->curClient) {
 		return;
@@ -189,6 +159,7 @@ void Nuria::Internal::HttpTcpTransport::bytesWritten (qint64 bytes) {
 		bytesSent (this->d_ptr->curClient, bytes);
 	}
 	
+	addBytesSent (bytes);
 }
 
 void Nuria::Internal::HttpTcpTransport::processData (QByteArray &data) {
@@ -197,24 +168,29 @@ void Nuria::Internal::HttpTcpTransport::processData (QByteArray &data) {
 	}
 	
 	// Process ...
-	this->d_ptr->bytesReceived += data.length ();
 	readFromRemote (this->d_ptr->curClient, data);
 	
 	// 
 	if (this->d_ptr->curClient &&
 	    (this->d_ptr->curClient->requestCompletelyReceived () || this->d_ptr->curClient->keepConnectionOpen ())) {
-		killTimeout ();
+		disableTimeout ();
 	}
 	
 }
 
+void Nuria::Internal::HttpTcpTransport::appendReceivedDataToBuffer () {
+	QByteArray data = this->d_ptr->socket->readAll ();
+	this->d_ptr->buffer.append (data);
+	addBytesReceived (data.length ());
+}
+
 void Nuria::Internal::HttpTcpTransport::dataReceived () {
+	appendReceivedDataToBuffer ();
+	
 	QByteArray &data = this->d_ptr->buffer;
-	data.append (this->d_ptr->socket->readAll ());
 	int len = 0;
 	
-	while (data.length () > 0 && data.length () != len &&
-	       this->d_ptr->socket->isOpen ()) {
+	while (data.length () > 0 && data.length () != len && this->d_ptr->socket->isOpen ()) {
 		if (this->d_ptr->curClient && !this->d_ptr->curClient->isOpen ()) {
 			close (this->d_ptr->curClient);
 		}
@@ -222,7 +198,7 @@ void Nuria::Internal::HttpTcpTransport::dataReceived () {
 		// 
 		if (!this->d_ptr->curClient) {
 			startTimeout (DataTimeout);
-			setCurrentRequestCount (currentRequestCount () + 1);
+			incrementRequestCount ();
 			this->d_ptr->curClient = new HttpClient (this, this->d_ptr->server);
 		}
 		
@@ -310,28 +286,6 @@ void Nuria::Internal::HttpTcpTransport::closeInternal () {
 
 bool Nuria::Internal::HttpTcpTransport::wasLastRequest () {
 	return (maxRequests () >= 0 && currentRequestCount () >= maxRequests ());
-}
-
-void Nuria::Internal::HttpTcpTransport::startTimeout (Timeout mode) {
-	killTimeout ();
-	
-	// Start new timer
-	this->d_ptr->timeoutMode = mode;
-	int msec = timeout (mode);
-	if (msec >= 0) {
-		this->d_ptr->timeoutTimer = startTimer (msec);
-	} else {
-		this->d_ptr->timeoutTimer = -1;
-	}
-	
-}
-
-void Nuria::Internal::HttpTcpTransport::killTimeout () {
-	if (this->d_ptr->timeoutTimer >= 0) {
-		killTimer (this->d_ptr->timeoutTimer);
-		this->d_ptr->timeoutTimer = -1;
-	}
-	
 }
 
 void Nuria::Internal::HttpTcpTransport::connectionReady () {

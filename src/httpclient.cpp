@@ -20,7 +20,6 @@
 #include <QTcpSocket>
 #include <QDateTime>
 #include <QProcess>
-#include <QTimer>
 #include <QDir>
 
 #include <nuria/temporarybufferdevice.hpp>
