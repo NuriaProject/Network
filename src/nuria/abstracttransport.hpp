@@ -32,11 +32,6 @@ class AbstractTransportPrivate;
  * a client through a specific connection. The connection can pretty much be
  * anything.
  * 
- * This class is meant to be a helper class offering basic transport management
- * functionality.
- * 
- * \par Transport information
- * 
  * AbstractTransport offers an interface to expose used local and remote address
  * and port of a networked connection. It can also keep track of processed
  * requests in general, and help count traffic.
