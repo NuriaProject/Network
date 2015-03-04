@@ -72,13 +72,6 @@ public:
 	 */
 	static JsonRpcRequest dissectRequestObject (const QJsonObject &object);
 	
-	/**
-	 * Treats every element in \a array as JSON-RPC request object and
-	 * adds all to \a elements, returning \c JsonRpc2_0 on success, or
-	 * a value less-equal to \c InvalidElement.
-	 */
-	static JsonRpcVersion dissectRequestArray (const QJsonArray &array, QVector< JsonRpcRequest > &elements);
-	
 	/** Constructs a JSON-RPC error response. */
 	static JsonRpcResponse getSuccessResponse (const QJsonValue &id, const QVariant &result);
 	

@@ -43,9 +43,7 @@ private slots:
 	
 	void serializeResponse_data ();
 	void serializeResponse ();
-	
-	void serializeResponseList ();
-};
+
 
 void JsonRpcUtilTest::jsonRpcErrorToString_data () {
 	QTest::addColumn< int > ("error");
@@ -285,21 +283,6 @@ void JsonRpcUtilTest::serializeResponse () {
 	QFETCH(QVariantMap, expected);
 	
 	QVariantMap result = JsonRpcUtil::serializeResponse (response).toVariantMap ();
-	QCOMPARE(result, expected);
-	
-}
-
-void JsonRpcUtilTest::serializeResponseList () {
-	JsonRpcResponse first = JsonRpcUtil::getErrorResponse (123, -32600);
-	JsonRpcResponse second = JsonRpcUtil::getSuccessResponse (123, "foo");
-	
-	QJsonObject firstObj = JsonRpcUtil::serializeResponse (first);
-	QJsonObject secondObj = JsonRpcUtil::serializeResponse (second);
-	
-	QJsonArray expected { firstObj, secondObj };
-	
-	// 
-	QJsonArray result = JsonRpcUtil::serializeResponseList ({ first, second });
 	QCOMPARE(result, expected);
 	
 }

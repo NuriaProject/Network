@@ -88,32 +88,6 @@ Nuria::Internal::JsonRpcRequest Nuria::Internal::JsonRpcUtil::dissectRequestObje
 	return result;
 }
 
-Nuria::Internal::JsonRpcVersion
-Nuria::Internal::JsonRpcUtil::dissectRequestArray (const QJsonArray &array, QVector< JsonRpcRequest > &elements) {
-	// Shortcut for empty arrays (Disallowed by the spec)
-	if (array.isEmpty ()) {
-		return InvalidRequest;
-	}
-	
-	// Iterate over elements
-	for (int i = 0, count = array.count (); i < count; i++) {
-		QJsonValue cur = array.at (i);
-		if (!cur.isObject ()) {
-			return InvalidRequest;
-		}
-		
-		// Dissect and check the element itself
-		elements.append (dissectRequestObject (cur.toObject ()));
-		if (elements.last ().version <= InvalidElement) {
-			return InvalidRequest;
-		}
-		
-	}
-	
-	// Ok!
-	return JsonRpc2_0;
-}
-
 Nuria::Internal::JsonRpcResponse
 Nuria::Internal::JsonRpcUtil::getSuccessResponse (const QJsonValue &id, const QVariant &result) {
 	JsonRpcResponse response;
