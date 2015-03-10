@@ -48,11 +48,20 @@ Nuria::Internal::JsonRpcRequest Nuria::Internal::JsonRpcUtil::dissectRequestObje
 	QJsonValue idValue = object.value (idField);
 	QJsonValue pathValue = object.value (pathField);
 	
-	// Json-Rpc 2.0 sanity check
-	if (jsonrpcValue.type () != QJsonValue::String ||
-	    idValue.type () == QJsonValue::Bool ||
+	// Json-Rpc 2.0 sanity check of the "id" field
+	if (idValue.type () == QJsonValue::Bool ||
 	    idValue.type () == QJsonValue::Array ||
-	    idValue.type () == QJsonValue::Object ||
+	    idValue.type () == QJsonValue::Object) {
+		result.version = InvalidRequest;
+	        return result;
+		
+	}
+	
+	// Store id now so we can reply with more precise error messages if needed.
+	result.id = idValue;
+	
+	// Check other fields
+	if (jsonrpcValue.type () != QJsonValue::String ||
 	    methodValue.type () != QJsonValue::String ||
 	    jsonrpcValue.toString () != jsonrpc2_0) {
 		result.version = InvalidRequest;
@@ -84,7 +93,6 @@ Nuria::Internal::JsonRpcRequest Nuria::Internal::JsonRpcUtil::dissectRequestObje
 	// Fill 'result'
 	result.method = methodValue.toString ();
 	result.params = paramsValue.toObject ().toVariantMap ();
-	result.id = idValue;
 	return result;
 }
 
