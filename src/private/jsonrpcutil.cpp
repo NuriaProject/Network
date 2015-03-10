@@ -137,13 +137,3 @@ QJsonObject Nuria::Internal::JsonRpcUtil::serializeResponse (const JsonRpcRespon
 	
 	return object;
 }
-
-QJsonArray Nuria::Internal::JsonRpcUtil::serializeResponseList (const QVector< JsonRpcResponse > &list) {
-	QJsonArray array;
-	
-	for (int i = 0, count = list.length (); i < count; i++) {
-		array.append (serializeResponse (list.at (i)));
-	}
-	
-	return array;
-}

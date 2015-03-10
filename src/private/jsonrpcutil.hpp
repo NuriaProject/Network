@@ -81,9 +81,6 @@ public:
 	/** Returns the serialized form of \a response. */
 	static QJsonObject serializeResponse (const JsonRpcResponse &response);
 	
-	/** Returns the serialized form of \a list. */
-	static QJsonArray serializeResponseList (const QVector< JsonRpcResponse > &list);
-	
 };
 
 } // namespace Internal
