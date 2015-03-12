@@ -118,21 +118,21 @@ void JsonRpcUtilTest::dissectRequestObject_data () {
 	QTest::newRow ("invalid-value-jsonrpc")
 	                << QVariantMap {
 	{ "jsonrpc", "1.0a" }, { "method", "foo" }, { "params", QVariantMap { } }, { "id", 123 } }
-	                << getJsonRpcRequest (InvalidRequest);
+	                << getJsonRpcRequest (InvalidRequest, QString (), QString (), QVariantMap (), 123);
 	
 	QTest::newRow ("invalid-no-jsonrpc")
 	                << QVariantMap { { "method", "foo" }, { "params", QVariantMap { } }, { "id", 123 } }
-	                << getJsonRpcRequest (InvalidRequest);
+	                << getJsonRpcRequest (InvalidRequest, QString (), QString (), QVariantMap (), 123);
 	
 	QTest::newRow ("invalid-method-not-string")
                         << QVariantMap {
 	{ "jsonrpc", "2.0" }, { "method", 123 }, { "params", QVariantMap { } }, { "id", 123 } }
-                        << getJsonRpcRequest (InvalidRequest);
+                        << getJsonRpcRequest (InvalidRequest, QString (), QString (), QVariantMap (), 123);
 	
 	QTest::newRow ("invalid-params-not-object")
 	                << QVariantMap {
 	{ "jsonrpc", "2.0" }, { "method", "foo" }, { "params", QVariantList { } }, { "id", 123 } }
-	                << getJsonRpcRequest (InvalidParams);
+	                << getJsonRpcRequest (InvalidParams, QString (), QString (), QVariantMap (), 123);
 	
 	QTest::newRow ("invalid-id-is-array")
 	                << QVariantMap {
@@ -148,7 +148,7 @@ void JsonRpcUtilTest::dissectRequestObject_data () {
                         << QVariantMap {
         { "jsonrpc", "2.0" }, { "method", "foo" }, { "params", QVariantMap { { "1", "2" } } },
 	{ "id", 123 }, { "path", 1337 } }
-                        << getJsonRpcRequest (InvalidRequest);
+                        << getJsonRpcRequest (InvalidRequest, QString (), QString (), QVariantMap (), 123);
         
 }
 
