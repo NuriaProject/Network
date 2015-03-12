@@ -34,16 +34,14 @@ private slots:
 	void dissectRequestObject_data ();
 	void dissectRequestObject ();
 	
-	void dissectRequestArray_data ();
-	void dissectRequestArray ();
-	
 	void getSuccessResponse ();
 	void getErrorResponseWithData ();
 	void getErrorResponseWithoutData ();
 	
 	void serializeResponse_data ();
 	void serializeResponse ();
-
+	
+};
 
 void JsonRpcUtilTest::jsonRpcErrorToString_data () {
 	QTest::addColumn< int > ("error");
@@ -165,64 +163,6 @@ void JsonRpcUtilTest::dissectRequestObject () {
 	QCOMPARE(result.method, expected.method);
 	QCOMPARE(result.params, expected.params);
 	QCOMPARE(result.path, expected.path);
-}
-
-typedef QVector< Nuria::Internal::JsonRpcRequest > RequestList;
-
-void JsonRpcUtilTest::dissectRequestArray_data () {
-	QTest::addColumn< QVariantList > ("list");
-	QTest::addColumn< JsonRpcVersion > ("expected");
-	QTest::addColumn< QVector< Nuria::Internal::JsonRpcRequest > > ("expectedVector");
-	
-	QVariantMap validA {
-		{ "jsonrpc", "2.0" }, { "method", "a" }, { "params", QVariantMap { { "1", "2" } } }, { "id", 123 }
-	};
-	
-	QVariantMap validB {
-		{ "jsonrpc", "2.0" }, { "method", "b" }, { "path", "/foo/bar" }, { "id", 456 }
-	};
-	
-	// Valid
-	QTest::newRow ("valid-1") << QVariantList { validA } << JsonRpc2_0
-	                          << RequestList { getJsonRpcRequest (JsonRpc2_0, "a", "", { { "1", "2" } }, 123) };
-	
-	QTest::newRow ("valid-2") << QVariantList { validA, validB } << JsonRpc2_0
-	                          << RequestList {
-	                             getJsonRpcRequest (JsonRpc2_0, "a", "", { { "1", "2" } }, 123),
-	                             getJsonRpcRequest (JsonRpc2_0_Resource, "b", "/foo/bar", { }, 456) };
-	
-	// Invalid
-	QTest::newRow ("invalid-1") << QVariantList { QVariantMap { { "jsonrpc", 123 } } } << InvalidRequest
-	                            << RequestList { };
-	
-	QTest::newRow ("invalid-2") << QVariantList { validA, QVariantMap { { "jsonrpc", 123 } } } << InvalidRequest
-	                            << RequestList { };
-	
-	QTest::newRow ("invalid-empty-array") << QVariantList { } << InvalidRequest << RequestList { };
-	QTest::newRow ("invalid-non-object-1") << QVariantList { 123 } << InvalidRequest << RequestList { };
-	QTest::newRow ("invalid-non-object-2") << QVariantList { validA, 123 } << InvalidRequest << RequestList { };
-	
-}
-
-static bool operator== (const JsonRpcRequest &left, const JsonRpcRequest &right) {
-	return (left.version == right.version && left.method == right.method &&
-	        left.params == right.params && left.path == right.path &&
-	        left.id == right.id);
-}
-
-void JsonRpcUtilTest::dissectRequestArray () {
-	QFETCH(QVariantList, list);
-	QFETCH(Nuria::Internal::JsonRpcVersion, expected);
-	QFETCH(QVector<Nuria::Internal::JsonRpcRequest>, expectedVector);
-	
-	QVector< JsonRpcRequest > vector;
-	JsonRpcVersion result = JsonRpcUtil::dissectRequestArray (QJsonArray::fromVariantList (list), vector);
-	
-	QCOMPARE(result, expected);
-	if (result > InvalidElement) {
-		QCOMPARE(vector, expectedVector);
-	}
-	
 }
 
 void JsonRpcUtilTest::getSuccessResponse () {
